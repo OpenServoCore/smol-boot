@@ -11,13 +11,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let memory_x = gen_memory_x(4);
     File::create(out.join("memory.x"))?.write_all(memory_x.as_bytes())?;
 
-    if env::var_os("CARGO_FEATURE_LOG").is_none() {
+    let rtt_log = env::var_os("RTT_LOG").is_some();
+    if rtt_log {
+        println!("cargo:rustc-cfg=rtt_log");
+    } else {
         // stub defmt.x to prevent linker errors when defmt is not used
         File::create(out.join("defmt.x"))?;
     }
 
     println!("cargo:rustc-link-search={}", out.display());
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo::rustc-check-cfg=cfg(rtt_log)");
+    println!("cargo:rerun-if-env-changed=RTT_LOG");
 
     Ok(())
 }

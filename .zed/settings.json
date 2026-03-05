@@ -1,0 +1,20 @@
+{
+  "languages": {
+    "Rust": {
+      "format_on_save": "on"
+    }
+  },
+  "lsp": {
+    "rust-analyzer": {
+      "initialization_options": {
+        "cargo": {
+          "target": "riscv32imc-unknown-none-elf"
+        },
+        "check": {
+          "command": "clippy",
+          "allTargets": false
+        }
+      }
+    }
+  }
+}

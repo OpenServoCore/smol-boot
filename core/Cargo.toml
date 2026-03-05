@@ -6,6 +6,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
+defmt = { workspace = true }
 
 [features]
 default = []

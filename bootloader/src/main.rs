@@ -3,36 +3,33 @@
 
 use qingke_rt::entry;
 
-#[cfg(not(feature = "log"))]
+#[cfg(not(rtt_log))]
 use panic_halt as _;
 
-#[cfg(feature = "log")]
+#[cfg(rtt_log)]
 use defmt_rtt as _;
 
-#[cfg(feature = "log")]
+use ch32_iap_core::{BootControl, log_error, log_info};
+
+#[cfg(rtt_log)]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
-    defmt::error!("panic");
+    log_error!("panic");
     loop {}
 }
 
-use ch32_iap_core::BootControl;
-
 #[entry]
 fn main() -> ! {
-    #[cfg(feature = "log")]
-    defmt::info!("Bootloader started");
+    log_info!("Bootloader started");
 
-    let boot = BootControl::read();
+    let boot = BootControl::default();
 
     if boot.should_boot_app() {
-        #[cfg(feature = "log")]
-        defmt::info!("Jumping to application");
+        log_info!("Jumping to application");
         unsafe { boot.jump_to_app() }
     }
 
-    #[cfg(feature = "log")]
-    defmt::info!("Entering bootloader mode");
+    log_info!("Entering bootloader mode");
 
     loop {}
 }

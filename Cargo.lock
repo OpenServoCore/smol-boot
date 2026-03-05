@@ -36,6 +36,9 @@ dependencies = [
 [[package]]
 name = "ch32-iap-core"
 version = "0.0.1"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "ch32-metapac"
