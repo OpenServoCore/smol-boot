@@ -15,7 +15,7 @@ pub struct Bootloader {
 impl Default for Bootloader {
     fn default() -> Self {
         let transport = Ch32UartTransport::new();
-        let flash = Ch32Flash::new();
+        let flash = Ch32Flash::new(ch32_metapac::FLASH);
         let abi = Ch32Abi::new();
         let reg = Ch32Registry::new();
         let hal = Hal::new(transport, flash, reg, abi);

@@ -4,8 +4,8 @@ pub const APP_MAGIC: u32 = 0xC0FF_EEEE;
 pub trait Transport: embedded_io::Read + embedded_io::Write {}
 impl<T> Transport for T where T: embedded_io::Read + embedded_io::Write {}
 
-pub trait Flash: embedded_storage::nor_flash::NorFlash + embedded_storage::ReadStorage {}
-impl<T> Flash for T where T: embedded_storage::nor_flash::NorFlash + embedded_storage::ReadStorage {}
+pub trait Flash: embedded_storage::nor_flash::NorFlash + embedded_storage::nor_flash::ReadNorFlash {}
+impl<T> Flash for T where T: embedded_storage::nor_flash::NorFlash + embedded_storage::nor_flash::ReadNorFlash {}
 
 /// Trait for system / app interactions.
 pub trait Abi {
