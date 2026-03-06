@@ -5,3 +5,5 @@ target
 *.pdb
 **/mutants.out*/
 /tmp
+
+Cargo.lock
