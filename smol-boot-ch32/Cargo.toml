@@ -26,7 +26,7 @@ ch32v003f4p6 = ["ch32-metapac/ch32v003f4p6"]
 memory-x = []
 
 # logging
-defmt = ["ch32-iap-core/defmt"]
+defmt = ["smol-boot/defmt"]
 
 # boot behavior
-require-app = ["ch32-iap-core/require-app"]
+require-app = ["smol-boot/require-app"]

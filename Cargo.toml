@@ -1,7 +1,7 @@
 [workspace]
 members = [
-    "bootloader",
-    "core"
+    "smol-boot",
+    "smol-boot-ch32",
 ]
 resolver = "2"
 
