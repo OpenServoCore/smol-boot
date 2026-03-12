@@ -1,2 +1,2 @@
-pub mod rs485;
-pub mod usart;
+pub(crate) mod rs485;
+pub(crate) mod usart;

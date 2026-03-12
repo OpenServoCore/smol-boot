@@ -1,6 +1,6 @@
 #![no_std]
 
-pub mod hal;
+pub(crate) mod hal;
 
 use tiny_boot::{Core, hal::Hal};
 
@@ -19,7 +19,8 @@ impl Default for Bootloader {
         let config = UsartConfig {
             duplex: Duplex::Full,
             baud: BaudRate::B115200,
-            pclk: 48_000_000,
+            // TODO: compute pclk from RCC registers instead of hardcoding
+            pclk: 8_000_000,
         };
         let transport = Usart::new(ch32_metapac::USART1, &config);
         let flash = Flash::new(ch32_metapac::FLASH);

@@ -46,8 +46,10 @@ pub struct UsartConfig {
     pub duplex: Duplex,
     pub baud: BaudRate,
 
-    /// Peripheral clock frequency in Hz (e.g. 48_000_000 for CH32V003 default).
-    /// Used to calculate the baud rate divisor.
+    /// Peripheral clock frequency in Hz feeding this USART.
+    /// Used to calculate the baud rate divisor (BRR = pclk / baud).
+    ///
+    /// For CH32V003: PCLK2 = HSI (24 MHz) / HPRE (default DIV3) = 8 MHz.
     pub pclk: u32,
 }
 
