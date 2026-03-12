@@ -3,6 +3,9 @@ use tiny_boot::{traits::BootCtl as TBBootCtl, log_info};
 use crate::common::*;
 use crate::hal::pfic;
 
+const BOOT_REQUEST_PTR: *mut u32 = RAM_BASE as *mut u32;
+const BOOT_REQUEST_MAGIC: u32 = 0xB007_CAFE;
+
 pub(crate) struct BootCtl;
 
 impl BootCtl {
@@ -21,6 +24,12 @@ impl TBBootCtl for BootCtl {
     fn system_reset(&mut self) -> ! {
         log_info!("Resetting...");
         pfic::system_reset(&ch32_metapac::PFIC);
+    }
+
+    fn take_boot_request(&mut self) -> bool {
+        let val = unsafe { core::ptr::read_volatile(BOOT_REQUEST_PTR) };
+        unsafe { core::ptr::write_volatile(BOOT_REQUEST_PTR, 0) };
+        val == BOOT_REQUEST_MAGIC
     }
 }
 
