@@ -4,13 +4,13 @@ pub mod traits;
 
 mod log;
 
-use traits::{BootCtl, BootState, BootStateStore, Platform, Storage, Transport};
+use traits::{BootCtl, BootMetaStore, BootState, Platform, Storage, Transport};
 
 pub struct Core<T, S, B, C>
 where
     T: Transport,
     S: Storage,
-    B: BootStateStore,
+    B: BootMetaStore,
     C: BootCtl,
 {
     platform: Platform<T, S, B, C>,
@@ -20,7 +20,7 @@ impl<T, S, B, C> Core<T, S, B, C>
 where
     T: Transport,
     S: Storage,
-    B: BootStateStore,
+    B: BootMetaStore,
     C: BootCtl,
 {
     pub fn new(platform: Platform<T, S, B, C>) -> Self {
@@ -30,15 +30,30 @@ where
     pub fn run(&mut self) -> ! {
         log_info!("Bootloader started");
 
-        let state = self.platform.boot_state.state().unwrap_or(BootState::Idle);
-        log_info!("Boot state: {:?}", state);
+        let mut enter = self.platform.ctl.take_boot_request();
 
-        match state {
-            BootState::Idle => self.handle_idle(),
-            BootState::Updating => self.handle_updating(),
-            BootState::Validating => self.handle_validating(),
-            BootState::Confirmed => self.handle_confirmed(),
+        if enter {
+            log_info!("Boot requested");
+            self.platform.boot_meta.advance().unwrap();
+        } else {
+            let meta = self.platform.boot_meta.read();
+            match meta.boot_state() {
+                BootState::Idle | BootState::Confirmed => {}
+                BootState::Updating | BootState::Corrupt => enter = true,
+                BootState::Validating => {
+                    if meta.trials_remaining() == 0 {
+                        enter = true;
+                    } else {
+                        self.platform.boot_meta.consume_trial().unwrap();
+                    }
+                }
+            }
         }
+
+        if enter || self.app_is_blank() {
+            self.enter_bootloader();
+        }
+        self.platform.ctl.jump_to_app();
     }
 
     /// Check if the app region contains valid code by reading the first word.
@@ -49,46 +64,6 @@ where
             return true;
         }
         buf == [0xFF; 4]
-    }
-
-    fn try_boot_app(&mut self) -> ! {
-        if self.app_is_blank() {
-            log_info!("No valid application found, entering bootloader mode");
-            self.enter_bootloader();
-        }
-        self.platform.ctl.jump_to_app();
-    }
-
-    fn handle_idle(&mut self) -> ! {
-        if self.platform.boot_state.boot_requested().unwrap_or(false) {
-            log_info!("Boot requested, entering bootloader mode");
-            self.platform.boot_state.transition().ok();
-            self.enter_bootloader();
-        }
-        log_info!("Jumping to application");
-        self.try_boot_app();
-    }
-
-    fn handle_updating(&mut self) -> ! {
-        log_info!("Update in progress");
-        self.enter_bootloader();
-    }
-
-    fn handle_validating(&mut self) -> ! {
-        let remaining = self.platform.boot_state.trials_remaining().unwrap_or(0);
-        if remaining == 0 {
-            log_info!("Trial boots exhausted, entering bootloader mode");
-            self.enter_bootloader();
-        }
-        log_info!("Trial boot ({} remaining)", remaining);
-        self.platform.boot_state.increment_trial().ok();
-        self.try_boot_app();
-    }
-
-    fn handle_confirmed(&mut self) -> ! {
-        log_info!("Boot confirmed, resetting state");
-        self.platform.boot_state.transition().ok(); // Confirmed → Idle (erase)
-        self.try_boot_app();
     }
 
     fn enter_bootloader(&mut self) -> ! {

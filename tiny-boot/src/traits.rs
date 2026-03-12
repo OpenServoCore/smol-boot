@@ -19,69 +19,119 @@ pub trait BootCtl {
 
     /// Reset the system after flash operations.
     fn system_reset(&mut self) -> !;
+
+    /// Check for a RAM-based boot request and clear it.
+    /// Returns true if the app requested bootloader entry (via soft reset).
+    fn take_boot_request(&mut self) -> bool;
 }
 
 /// Current stage in the firmware update lifecycle.
+///
+/// Each state is a contiguous run of 1-bits from bit 0.
+/// Advancing clears the MSB: `next = state & (state >> 1)`.
+///
+/// ```text
+/// 0xFFFF  Idle        (16 ones)
+/// 0x7FFF  Updating    (15 ones)
+/// 0x3FFF  Validating  (14 ones)
+/// 0x1FFF  Confirmed   (13 ones)
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u16)]
 pub enum BootState {
-    /// No update in progress. Normal app boot.
-    Idle,
+    /// No update in progress. Normal app boot. Erased flash default.
+    Idle = 0xFFFF,
     /// Firmware transfer in progress.
-    Updating,
+    Updating = 0x7FFF,
     /// New firmware written, trial booting the app.
-    Validating,
+    Validating = 0x3FFF,
     /// App confirmed successful boot.
-    Confirmed,
+    Confirmed = 0x1FFF,
+    /// Stored value doesn't match any valid variant.
+    Corrupt = 0x0000,
 }
 
-/// Persistent boot state storage.
-///
-/// Models a state machine for firmware update lifecycle. Implementations
-/// may be backed by option bytes, a flash page, EEPROM, backup registers,
-/// or any persistent storage.
-///
-/// State transitions:
-///
-///   TrialBoot:
-///     Idle → Updating → Validating → Confirmed → Idle
-///     The Validating state uses a trial counter — if the app fails to
-///     confirm within N boots, we stay in bootloader mode, so that the
-///     user can attempt to reflash the app.
-///
-///   Relaxed:
-///     Idle → Updating → Confirmed → Idle
-///     Skips validation — flash and go.
-///
-pub trait BootStateStore {
-    type Error;
+impl BootState {
+    pub fn from_u16(v: u16) -> Self {
+        match v {
+            0xFFFF => BootState::Idle,
+            0x7FFF => BootState::Updating,
+            0x3FFF => BootState::Validating,
+            0x1FFF => BootState::Confirmed,
+            _ => BootState::Corrupt,
+        }
+    }
+}
 
-    /// Whether the app has requested to enter the bootloader.
-    fn boot_requested(&mut self) -> Result<bool, Self::Error>;
+/// Persistent boot metadata.
+///
+/// Stored in flash at a known address. Fields are laid out so that
+/// forward state transitions and trial consumption only require 1→0
+/// bit writes (no erase). A full erase + write is only needed to
+/// return to a blank state.
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(C)]
+pub struct BootMeta {
+    /// Current boot lifecycle state.
+    pub state: u16,
+    /// Trial boot counter. Each consumed trial clears one bit (1→0).
+    /// 0xFFFF = 16 remaining, ..., 0x0000 = exhausted.
+    pub trials: u16,
+    /// Checksum of the application firmware image.
+    pub app_checksum: u32,
+    /// Size of the application firmware image in bytes.
+    pub app_size: u32,
+}
 
-    /// Read the current boot state.
-    fn state(&mut self) -> Result<BootState, Self::Error>;
+impl BootMeta {
+    pub const SIZE: usize = core::mem::size_of::<Self>();
 
-    /// Advance to the next state.
-    fn transition(&mut self) -> Result<BootState, Self::Error>;
+    /// Number of trial boots remaining before exhausted.
+    pub fn trials_remaining(&self) -> u8 {
+        self.trials.count_ones() as u8
+    }
 
-    /// Decrement the trial boot counter by one.
-    fn increment_trial(&mut self) -> Result<(), Self::Error>;
+    /// Decode the state field.
+    pub fn boot_state(&self) -> BootState {
+        BootState::from_u16(self.state)
+    }
+}
 
-    /// Number of trial boots remaining before the bootloader should roll back.
-    fn trials_remaining(&mut self) -> Result<u8, Self::Error>;
+/// Persistent boot metadata storage.
+///
+/// Provides read access to the full `BootMeta` struct and forward-only
+/// state transitions (1→0 writes). No explicit write/reset is needed:
+/// erased storage (all 0xFF) naturally represents the default state
+/// (Idle, full trials). The host writes the meta struct as part of
+/// the normal firmware transfer.
+pub trait BootMetaStore {
+    type Error: core::fmt::Debug;
+
+    /// Read the current boot metadata.
+    fn read(&self) -> BootMeta;
+
+    /// Advance the boot state forward by one step.
+    /// Returns the new state on success.
+    /// Errors if the state is `Confirmed` or `Corrupt`.
+    fn advance(&mut self) -> Result<BootState, Self::Error>;
+
+    /// Consume one trial boot (clears one bit in the trials field).
+    /// Errors if trials are already exhausted.
+    fn consume_trial(&mut self) -> Result<(), Self::Error>;
 }
 
 pub struct Platform<T, S, B, C>
 where
     T: Transport,
     S: Storage,
-    B: BootStateStore,
+    B: BootMetaStore,
     C: BootCtl,
 {
     pub transport: T,
     pub storage: S,
-    pub boot_state: B,
+    pub boot_meta: B,
     pub ctl: C,
 }
 
@@ -89,14 +139,14 @@ impl<T, S, B, C> Platform<T, S, B, C>
 where
     T: Transport,
     S: Storage,
-    B: BootStateStore,
+    B: BootMetaStore,
     C: BootCtl,
 {
-    pub fn new(transport: T, storage: S, boot_state: B, ctl: C) -> Self {
+    pub fn new(transport: T, storage: S, boot_meta: B, ctl: C) -> Self {
         Self {
             transport,
             storage,
-            boot_state,
+            boot_meta,
             ctl,
         }
     }
