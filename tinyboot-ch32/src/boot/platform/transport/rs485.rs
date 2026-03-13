@@ -27,7 +27,11 @@ pub struct Rs485<P: OutputPin> {
 
 impl<P: OutputPin> Rs485<P> {
     pub fn new(usart: Usart, dir_pin: P, polarity: Polarity) -> Self {
-        let mut rs485 = Rs485 { usart, dir_pin, polarity };
+        let mut rs485 = Rs485 {
+            usart,
+            dir_pin,
+            polarity,
+        };
         rs485.set_rx();
         rs485
     }

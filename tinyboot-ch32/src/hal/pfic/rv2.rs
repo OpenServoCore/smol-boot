@@ -7,5 +7,7 @@ pub(crate) fn system_reset(pfic: &Pfic) -> ! {
         w.set_keycode(0xBEEF);
         w.set_resetsys(true);
     });
-    loop {}
+    loop {
+        core::hint::spin_loop();
+    }
 }

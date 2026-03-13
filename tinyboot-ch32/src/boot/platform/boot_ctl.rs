@@ -1,4 +1,4 @@
-use tinyboot::{traits::BootCtl as TBBootCtl, log_info};
+use tinyboot::{log_info, traits::BootCtl as TBBootCtl};
 
 use crate::common::*;
 use crate::hal::pfic;

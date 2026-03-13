@@ -7,9 +7,7 @@ compile_error!(
 );
 
 #[cfg(not(any(feature = "bootloader", feature = "app")))]
-compile_error!(
-    "Select either \"bootloader\" or \"app\" feature to indicate build role."
-);
+compile_error!("Select either \"bootloader\" or \"app\" feature to indicate build role.");
 
 pub(crate) mod common;
 pub(crate) mod hal;

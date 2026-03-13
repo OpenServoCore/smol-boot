@@ -55,7 +55,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-
 /// Certain chip specific data are stored in ch32-metapac and we
 /// need to use them for constant generics. This function generates
 /// the constants required for the chip.
@@ -73,26 +72,55 @@ fn gen_constants(boot_pages: usize) -> String {
     // Constants needed by both boot and app
     use std::fmt::Write;
     writeln!(s, "/// Base address of the boot meta struct.").unwrap();
-    writeln!(s, "pub(crate) const META_BASE: u32 = {};", flash.sections.meta.base).unwrap();
+    writeln!(
+        s,
+        "pub(crate) const META_BASE: u32 = {};",
+        flash.sections.meta.base
+    )
+    .unwrap();
     writeln!(s).unwrap();
     writeln!(s, "/// Base address of RAM.").unwrap();
-    writeln!(s, "pub(crate) const RAM_BASE: u32 = {};", ram_base).unwrap();
+    writeln!(s, "pub(crate) const RAM_BASE: u32 = {ram_base};").unwrap();
 
     // Constants only needed by the bootloader
     #[cfg(feature = "bootloader")]
     {
         writeln!(s).unwrap();
         writeln!(s, "/// Size of a single write operation in bytes.").unwrap();
-        writeln!(s, "pub(crate) const FLASH_WRITE_SIZE: usize = {};", flash.write_size).unwrap();
+        writeln!(
+            s,
+            "pub(crate) const FLASH_WRITE_SIZE: usize = {};",
+            flash.write_size
+        )
+        .unwrap();
         writeln!(s).unwrap();
         writeln!(s, "/// Size of a single erase operation in bytes.").unwrap();
-        writeln!(s, "pub(crate) const FLASH_ERASE_SIZE: usize = {};", flash.erase_size).unwrap();
+        writeln!(
+            s,
+            "pub(crate) const FLASH_ERASE_SIZE: usize = {};",
+            flash.erase_size
+        )
+        .unwrap();
         writeln!(s).unwrap();
         writeln!(s, "/// Base address of the application section.").unwrap();
-        writeln!(s, "pub(crate) const APP_BASE: u32 = {};", flash.sections.app.base).unwrap();
+        writeln!(
+            s,
+            "pub(crate) const APP_BASE: u32 = {};",
+            flash.sections.app.base
+        )
+        .unwrap();
         writeln!(s).unwrap();
-        writeln!(s, "/// Size of the application section in bytes (excludes meta region).").unwrap();
-        writeln!(s, "pub(crate) const APP_SIZE: usize = {};", flash.sections.app.size).unwrap();
+        writeln!(
+            s,
+            "/// Size of the application section in bytes (excludes meta region)."
+        )
+        .unwrap();
+        writeln!(
+            s,
+            "pub(crate) const APP_SIZE: usize = {};",
+            flash.sections.app.size
+        )
+        .unwrap();
     }
 
     s
@@ -173,9 +201,10 @@ REGION_ALIAS("REGION_STACK", RAM);
 }
 
 struct FlashInfo {
-    base: u32,
     size: usize,
+    #[cfg(feature = "bootloader")]
     erase_size: usize,
+    #[cfg(feature = "bootloader")]
     write_size: usize,
     sections: Sections,
 }
@@ -230,9 +259,10 @@ impl FlashInfo {
         let meta_address = app_address + (app_size - meta_size) as u32;
 
         FlashInfo {
-            base: flash_base,
             size: flash_size,
+            #[cfg(feature = "bootloader")]
             erase_size: flash_erase_size,
+            #[cfg(feature = "bootloader")]
             write_size: flash_write_size,
             sections: Sections {
                 boot: SectionInfo {

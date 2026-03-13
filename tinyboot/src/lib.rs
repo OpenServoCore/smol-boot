@@ -69,6 +69,8 @@ where
     fn enter_bootloader(&mut self) -> ! {
         log_info!("Entering bootloader mode");
         // TODO: firmware update loop over transport
-        loop {}
+        loop {
+            core::hint::spin_loop();
+        }
     }
 }
