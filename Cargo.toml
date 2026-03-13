@@ -1,14 +1,14 @@
 [workspace]
 members = [
-    "tiny-boot",
-    "tiny-boot-ch32",
+    "tinyboot",
+    "tinyboot-ch32",
 ]
 resolver = "2"
 
 [workspace.package]
 version = "0.0.1"
 edition = "2024"
-repository = "https://github.com/OpenServoCore/tiny-boot"
+repository = "https://github.com/OpenServoCore/tinyboot"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
