@@ -1,25 +1,8 @@
 #![no_std]
 
-pub mod command;
 pub mod crc;
-pub mod response;
-
-/// Frame header.
-pub const HEAD: [u8; 2] = [0xAA, 0x55];
-
-/// CRC16 initial value.
-pub const CRC_INIT: u16 = 0xFFFF;
-
-/// Write the frame envelope: HEAD at `buf[0..2]`, CRC over `buf[2..payload_end]`,
-/// then CRC. Returns total frame length.
-pub(crate) fn seal(buf: &mut [u8], payload_end: usize) -> usize {
-    buf[0] = HEAD[0];
-    buf[1] = HEAD[1];
-    let crc = crc::crc16(CRC_INIT, &buf[2..payload_end]);
-    buf[payload_end] = crc as u8;
-    buf[payload_end + 1] = (crc >> 8) as u8;
-    payload_end + 2
-}
+pub mod frame;
+pub(crate) mod sync;
 
 /// Commands (host → device).
 #[repr(u8)]
@@ -34,15 +17,9 @@ pub enum Cmd {
 }
 
 impl Cmd {
-    pub fn from_u8(b: u8) -> Option<Self> {
-        match b {
-            0x01 => Some(Cmd::Info),
-            0x02 => Some(Cmd::Erase),
-            0x03 => Some(Cmd::Write),
-            0x04 => Some(Cmd::Verify),
-            0x05 => Some(Cmd::Reset),
-            _ => None,
-        }
+    pub fn is_valid(&self) -> bool {
+        let b = unsafe { *(self as *const Self as *const u8) };
+        (0x01..=0x05).contains(&b)
     }
 }
 
@@ -56,19 +33,27 @@ pub enum Status {
     CrcMismatch = 0x02,
     AddrOutOfBounds = 0x03,
     NotReady = 0x04,
+    Request = 0x05,
 }
 
 impl Status {
-    pub fn from_u8(b: u8) -> Option<Self> {
-        match b {
-            0x00 => Some(Status::Ok),
-            0x01 => Some(Status::Error),
-            0x02 => Some(Status::CrcMismatch),
-            0x03 => Some(Status::AddrOutOfBounds),
-            0x04 => Some(Status::NotReady),
-            _ => None,
-        }
+    pub fn is_valid(&self) -> bool {
+        let b = unsafe { *(self as *const Self as *const u8) };
+        b <= 0x05
     }
+}
+
+/// Frame parse/validation error.
+#[derive(Debug, PartialEq)]
+pub enum ReadError {
+    /// Transport IO error.
+    Io,
+    /// CRC mismatch.
+    Crc,
+    /// Invalid command or status byte.
+    InvalidFrame,
+    /// Data payload exceeds buffer size.
+    Overflow,
 }
 
 #[cfg(test)]
@@ -76,15 +61,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cmd_from_u8_valid() {
-        assert_eq!(Cmd::from_u8(0x01), Some(Cmd::Info));
-        assert_eq!(Cmd::from_u8(0x05), Some(Cmd::Reset));
+    fn cmd_is_valid() {
+        assert!(Cmd::Info.is_valid());
+        assert!(Cmd::Reset.is_valid());
     }
 
     #[test]
-    fn cmd_from_u8_invalid() {
-        assert_eq!(Cmd::from_u8(0x00), None);
-        assert_eq!(Cmd::from_u8(0x06), None);
-        assert_eq!(Cmd::from_u8(0xFF), None);
+    fn cmd_invalid_discriminant() {
+        let bad: Cmd = unsafe { core::mem::transmute(0x00u8) };
+        assert!(!bad.is_valid());
+        let bad: Cmd = unsafe { core::mem::transmute(0x06u8) };
+        assert!(!bad.is_valid());
     }
 }
