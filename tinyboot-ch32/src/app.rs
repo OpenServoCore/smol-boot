@@ -1,6 +1,6 @@
 use tinyboot::traits::{BootClient as TBBootClient, BootMeta, BootState};
 
-use crate::hal::flash::{self, FlashWriter};
+use crate::hal::flash::FlashWriter;
 use crate::hal::pfic;
 
 const STATE_OFFSET: u32 = 0;
@@ -40,7 +40,10 @@ impl TBBootClient for BootClient {
 
     fn request_update(&mut self) -> ! {
         critical_section::with(|_| {
-            flash::set_boot_mode(true);
+            #[cfg(feature = "system-flash")]
+            crate::hal::flash::set_boot_mode(true);
+            #[cfg(not(feature = "system-flash"))]
+            crate::hal::boot_request::set_boot_request(true);
         });
         pfic::system_reset()
     }

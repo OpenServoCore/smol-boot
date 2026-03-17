@@ -32,3 +32,7 @@ rt = []
 
 # Enable trial-boot FSM in the bootloader
 trial-boot = ["tinyboot/trial-boot"]
+
+# Bootloader runs from system flash (uses BOOT_MODE register for boot request).
+# When disabled, bootloader runs from user flash (uses RAM magic word for boot request).
+system-flash = []
