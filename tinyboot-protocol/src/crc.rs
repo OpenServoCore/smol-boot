@@ -1,3 +1,6 @@
+/// CRC16 initial value.
+pub const CRC_INIT: u16 = 0xFFFF;
+
 /// CRC16-CCITT (poly 0x1021, init 0xFFFF).
 ///
 /// Bit-bang implementation — no lookup table, minimal flash footprint.
