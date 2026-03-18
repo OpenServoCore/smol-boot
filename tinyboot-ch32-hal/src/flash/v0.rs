@@ -15,25 +15,50 @@ fn wait_busy() {
     while flash().statr().read().bsy() {}
 }
 
+fn unlock_keys() {
+    flash().keyr().write(|w| w.set_keyr(KEY1));
+    fence(Ordering::SeqCst);
+    flash().keyr().write(|w| w.set_keyr(KEY2));
+    fence(Ordering::SeqCst);
+}
+
+fn unlock_fast() {
+    flash().modekeyr().write(|w| w.set_modekeyr(KEY1));
+    fence(Ordering::SeqCst);
+    flash().modekeyr().write(|w| w.set_modekeyr(KEY2));
+    fence(Ordering::SeqCst);
+}
+
+fn unlock_boot() {
+    flash().boot_modekeyp().write(|w| w.set_modekeyr(KEY1));
+    fence(Ordering::SeqCst);
+    flash().boot_modekeyp().write(|w| w.set_modekeyr(KEY2));
+    fence(Ordering::SeqCst);
+}
+
 /// RAII guard for flash programming. Unlocks on creation, locks on drop.
 pub struct FlashWriter;
 
 impl FlashWriter {
+    /// Unlock for standard operations on user flash (KEYR).
     pub fn standard() -> Self {
-        flash().keyr().write(|w| w.set_keyr(KEY1));
-        fence(Ordering::SeqCst);
-        flash().keyr().write(|w| w.set_keyr(KEY2));
-        fence(Ordering::SeqCst);
+        unlock_keys();
         Self
     }
 
+    /// Unlock for fast operations on user flash (KEYR + MODEKEYR).
     pub fn fast() -> Self {
-        let s = Self::standard();
-        flash().modekeyr().write(|w| w.set_modekeyr(KEY1));
-        fence(Ordering::SeqCst);
-        flash().modekeyr().write(|w| w.set_modekeyr(KEY2));
-        fence(Ordering::SeqCst);
-        s
+        unlock_keys();
+        unlock_fast();
+        Self
+    }
+
+    /// Unlock for operations on system flash (KEYR + MODEKEYR + BOOT_MODEKEYP).
+    pub fn system() -> Self {
+        unlock_keys();
+        unlock_fast();
+        unlock_boot();
+        Self
     }
 
     pub fn check_wrprterr(&self) -> bool {
@@ -48,6 +73,7 @@ impl FlashWriter {
         false
     }
 
+    /// Standard halfword (2-byte) write. Works on user and system flash.
     pub fn write_halfword(&self, addr: u32, value: u16) {
         flash().ctlr().modify(|w| w.set_pg(true));
         fence(Ordering::SeqCst);
@@ -56,6 +82,8 @@ impl FlashWriter {
         flash().ctlr().modify(|w| w.set_pg(false));
     }
 
+    /// Fast 64-byte page erase. Works on user and system flash.
+    /// Note: standard 1K erase (PER) does NOT work on system flash.
     pub fn erase_page(&self, addr: u32) {
         flash().ctlr().modify(|w| w.set_page_er(true));
         fence(Ordering::SeqCst);
@@ -66,6 +94,7 @@ impl FlashWriter {
         flash().ctlr().modify(|w| w.set_page_er(false));
     }
 
+    /// Fast 64-byte page write. Works on user and system flash.
     pub fn write_page(&self, addr: u32, data: &[u8]) {
         let prog_addr = addr;
 
@@ -108,10 +137,7 @@ pub fn is_boot_mode() -> bool {
 
 pub fn set_boot_mode(mode: bool) {
     if flash().statr().read().boot_lock() {
-        flash().boot_modekeyp().write(|w| w.set_modekeyr(KEY1));
-        fence(Ordering::SeqCst);
-        flash().boot_modekeyp().write(|w| w.set_modekeyr(KEY2));
-        fence(Ordering::SeqCst);
+        unlock_boot();
     }
     flash().statr().modify(|w| w.set_boot_mode(mode));
 }

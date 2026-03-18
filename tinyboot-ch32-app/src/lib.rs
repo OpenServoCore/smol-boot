@@ -35,6 +35,9 @@ impl TBBootClient for BootClient {
                 return;
             }
             let next = meta.state & (meta.state >> 1);
+            #[cfg(feature = "system-flash")]
+            let writer = FlashWriter::system();
+            #[cfg(not(feature = "system-flash"))]
             let writer = FlashWriter::standard();
             writer.write_halfword(self.meta_base + STATE_OFFSET, next);
         });

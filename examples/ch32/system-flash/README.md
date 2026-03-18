@@ -32,6 +32,13 @@ entire 16KB user flash available for applications.
  └──────────────────────────────┘ 0x20000800
 ```
 
+## Boot Metadata Placement
+
+**Placement rules:**
+- Bootloader must start at the beginning of its flash region.
+- Boot metadata must be in the same flash region as the bootloader.
+- Boot metadata must be exactly 64 bytes, aligned to a 64-byte page boundary.
+
 ## Boot Request Mechanism
 
 Uses the hardware `BOOT_MODE` register in the CH32V003 flash controller

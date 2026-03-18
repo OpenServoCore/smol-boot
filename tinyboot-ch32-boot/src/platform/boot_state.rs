@@ -31,6 +31,9 @@ impl BootMetaStore {
     }
 
     fn patch_u16(&mut self, offset: u32, value: u16) {
+        #[cfg(feature = "system-flash")]
+        let writer = FlashWriter::system();
+        #[cfg(not(feature = "system-flash"))]
         let writer = FlashWriter::standard();
         writer.write_halfword(self.meta_base + offset, value);
     }

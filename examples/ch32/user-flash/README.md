@@ -68,7 +68,12 @@ The 4KB/12KB split can be adjusted by changing:
 3. `app/memory.x` — `FLASH` origin and length
 
 All three must agree. The bootloader partition must be aligned to the flash
-erase size (1KB on CH32V003).
+erase size (64 bytes on CH32V003).
+
+**Placement rules:**
+- Bootloader must start at the beginning of its flash region.
+- Boot metadata must be in the same flash region as the bootloader.
+- Boot metadata must be exactly 64 bytes, aligned to a 64-byte page boundary.
 
 ## Building
 
