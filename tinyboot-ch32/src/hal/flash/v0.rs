@@ -4,10 +4,9 @@ use core::sync::atomic::{Ordering, fence};
 const KEY1: u32 = 0x4567_0123;
 const KEY2: u32 = 0xCDEF_89AB;
 
-/// The FPEC on flash_v0 chips requires 0x0800_0000-based addresses for
-/// programming, even though flash is mapped at 0x0000_0000 for reads.
-const FLASH_PROGRAM_BASE: u32 = 0x0800_0000;
-
+/// All flash addresses passed to FlashWriter methods must use FPEC
+/// programming addresses (0x0800_0000-based for user flash,
+/// 0x1FFFF000-based for system flash).
 fn flash() -> ch32_metapac::flash::Flash {
     ch32_metapac::FLASH
 }
@@ -50,10 +49,9 @@ impl FlashWriter {
     }
 
     pub fn write_halfword(&self, addr: u32, value: u16) {
-        let prog_addr = FLASH_PROGRAM_BASE + addr;
         flash().ctlr().modify(|w| w.set_pg(true));
         fence(Ordering::SeqCst);
-        unsafe { core::ptr::write_volatile(prog_addr as *mut u16, value) };
+        unsafe { core::ptr::write_volatile(addr as *mut u16, value) };
         wait_busy();
         flash().ctlr().modify(|w| w.set_pg(false));
     }
@@ -61,9 +59,7 @@ impl FlashWriter {
     pub fn erase_page(&self, addr: u32) {
         flash().ctlr().modify(|w| w.set_page_er(true));
         fence(Ordering::SeqCst);
-        flash()
-            .addr()
-            .write(|w| w.set_addr(FLASH_PROGRAM_BASE + addr));
+        flash().addr().write(|w| w.set_addr(addr));
         fence(Ordering::SeqCst);
         flash().ctlr().modify(|w| w.set_strt(true));
         wait_busy();
@@ -71,7 +67,7 @@ impl FlashWriter {
     }
 
     pub fn write_page(&self, addr: u32, data: &[u8]) {
-        let prog_addr = FLASH_PROGRAM_BASE + addr;
+        let prog_addr = addr;
 
         flash().ctlr().modify(|w| w.set_page_pg(true));
         flash().ctlr().modify(|w| w.set_bufrst(true));

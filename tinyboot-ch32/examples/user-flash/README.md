@@ -73,11 +73,23 @@ erase size (1KB on CH32V003).
 ## Building
 
 ```sh
-# Check
-cargo check -p boot
-cargo check -p app
+cargo build -p boot --release
+cargo build -p app --release
+```
 
-# Build and flash (requires probe-rs)
-cargo run -p boot
-cargo run -p app
+## Flashing
+
+Both the bootloader and app must be flashed with
+[wlink](https://github.com/ch32-rs/wlink) because probe-rs does not support the
+VMA/LMA split used by the bootloader's linker script, and the app starts at a
+non-zero offset that probe-rs doesn't expect.
+
+wlink reads the ELF directly and uses the LMA for placement — no objcopy needed.
+
+```sh
+# Flash bootloader
+wlink flash --chip CH32V003 target/riscv32ec-unknown-none-elf/release/boot
+
+# Flash app
+wlink flash --chip CH32V003 target/riscv32ec-unknown-none-elf/release/app
 ```

@@ -62,11 +62,22 @@ To stay within the 1856-byte budget:
 ## Building
 
 ```sh
-# Check
-cargo check -p boot
-cargo check -p app
+cargo build -p boot --release
+cargo build -p app --release
+```
 
-# Build and flash (requires probe-rs)
-cargo run -p boot
-cargo run -p app
+## Flashing
+
+The bootloader must be flashed with [wlink](https://github.com/ch32-rs/wlink)
+because probe-rs does not support writing to system flash, and the bootloader's
+VMA (0x0) differs from its LMA (0x1FFFF000) which probe-rs cannot handle.
+
+wlink reads the ELF directly and uses the LMA for placement — no objcopy needed.
+
+```sh
+# Flash bootloader to system flash
+wlink flash --chip CH32V003 target/riscv32ec-unknown-none-elf/release/boot
+
+# Flash app to user flash (wlink or probe-rs both work)
+wlink flash --chip CH32V003 target/riscv32ec-unknown-none-elf/release/app
 ```
