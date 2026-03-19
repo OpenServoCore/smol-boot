@@ -1,4 +1,4 @@
-use tinyboot::traits::BootCtl as TBBootCtl;
+use tinyboot::traits::boot::BootCtl as TBBootCtl;
 
 use tinyboot_ch32_hal::pfic;
 
@@ -35,22 +35,20 @@ impl TBBootCtl for BootCtl {
         }
     }
 
-    fn clear_boot_request(&mut self) {
+    fn system_reset(&mut self, bootloader: bool) -> ! {
         #[cfg(feature = "system-flash")]
-        tinyboot_ch32_hal::flash::set_boot_mode(false);
+        {
+            tinyboot_ch32_hal::flash::set_boot_mode(bootloader);
+            pfic::system_reset()
+        }
         #[cfg(not(feature = "system-flash"))]
-        tinyboot_ch32_hal::boot_request::set_boot_request(false);
-    }
-
-    fn system_reset(&mut self) -> ! {
-        pfic::system_reset();
-    }
-
-    fn boot_app(&mut self) -> ! {
-        self.clear_boot_request();
-        #[cfg(feature = "system-flash")]
-        self.system_reset();
-        #[cfg(not(feature = "system-flash"))]
-        pfic::jump(self.app_entry)
+        {
+            if bootloader {
+                tinyboot_ch32_hal::boot_request::set_boot_request(true);
+                pfic::system_reset()
+            } else {
+                pfic::jump(self.app_entry)
+            }
+        }
     }
 }

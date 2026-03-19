@@ -1,4 +1,5 @@
-use crate::traits::{BootCtl, BootMetaStore, Platform, Storage, Transport};
+use crate::traits::BootState;
+use crate::traits::boot::{BootCtl, BootMetaStore, Platform, Storage, Transport};
 use tinyboot_protocol::crc::{CRC_INIT, crc16};
 use tinyboot_protocol::frame::{Frame, InfoData, VerifyData};
 use tinyboot_protocol::{Cmd, ReadError, Status};
@@ -34,24 +35,33 @@ impl<'a, const D: usize, T: Transport<D>, S: Storage, B: BootMetaStore, C: BootC
 
         match self.frame.cmd {
             Cmd::Info => {
-                self.frame.len = 8;
+                self.frame.len = 10;
                 self.frame.data.info = InfoData {
                     capacity,
                     payload_size: D as u16,
                     erase_size: erase_size as u16,
+                    version: 0,
                 };
             }
             Cmd::Erase => {
                 let addr = self.frame.addr;
                 if !addr.is_multiple_of(erase_size) || addr + erase_size > capacity {
                     self.frame.status = Status::AddrOutOfBounds;
-                } else if self
-                    .platform
-                    .storage
-                    .erase(addr, addr + erase_size)
-                    .is_err()
-                {
-                    self.frame.status = Status::WriteError;
+                } else {
+                    // First erase transitions Idle → Updating
+                    if self.platform.boot_meta.boot_state() == BootState::Idle
+                        && self.platform.boot_meta.advance().is_err()
+                    {
+                        self.frame.status = Status::WriteError;
+                    }
+                    if self
+                        .platform
+                        .storage
+                        .erase(addr, addr + erase_size)
+                        .is_err()
+                    {
+                        self.frame.status = Status::WriteError;
+                    }
                 }
             }
             Cmd::Write => {
@@ -65,7 +75,10 @@ impl<'a, const D: usize, T: Transport<D>, S: Storage, B: BootMetaStore, C: BootC
                 } else if self
                     .platform
                     .storage
-                    .write(addr, unsafe { &self.frame.data.raw[..data_len] })
+                    // SAFETY: data_len <= D validated by frame.read() overflow check
+                    .write(addr, unsafe {
+                        self.frame.data.raw.get_unchecked(..data_len)
+                    })
                     .is_err()
                 {
                     self.frame.status = Status::WriteError;
@@ -75,14 +88,18 @@ impl<'a, const D: usize, T: Transport<D>, S: Storage, B: BootMetaStore, C: BootC
                 let crc = crc16(CRC_INIT, self.platform.storage.as_slice());
                 self.frame.len = 2;
                 self.frame.data.verify = VerifyData { crc };
-                #[cfg(feature = "trial-boot")]
-                if self.platform.boot_meta.advance().is_err() {
+                if self
+                    .platform
+                    .boot_meta
+                    .refresh(crc, BootState::Validating)
+                    .is_err()
+                {
                     self.frame.status = Status::WriteError;
                 }
             }
             Cmd::Reset => {
                 let _ = self.frame.send(&mut self.platform.transport);
-                self.platform.ctl.system_reset();
+                self.platform.ctl.system_reset(self.frame.addr == 1);
             }
         }
 
@@ -178,7 +195,7 @@ mod tests {
         }
     }
 
-    impl crate::traits::Storage for MockStorage {
+    impl crate::traits::boot::Storage for MockStorage {
         fn as_slice(&self) -> &[u8] {
             &self.data
         }
@@ -233,30 +250,31 @@ mod tests {
         fn is_boot_requested(&self) -> bool {
             false
         }
-        fn clear_boot_request(&mut self) {}
-        fn system_reset(&mut self) -> ! {
+        fn system_reset(&mut self, _bootloader: bool) -> ! {
             panic!("mock reset")
-        }
-        fn boot_app(&mut self) -> ! {
-            panic!("mock boot_app")
         }
     }
 
     struct MockBootMeta;
     impl BootMetaStore for MockBootMeta {
         type Error = ();
-        fn read(&self) -> crate::traits::BootMeta {
-            crate::traits::BootMeta {
-                state: 0xFFFF,
-                trials: 0xFFFF,
-                app_checksum: 0,
-                app_size: 0,
-            }
+        fn boot_state(&self) -> crate::traits::BootState {
+            crate::traits::BootState::Idle
+        }
+        fn trials_remaining(&self) -> u8 {
+            16
+        }
+
+        fn app_checksum(&self) -> u16 {
+            0xFFFF
         }
         fn advance(&mut self) -> Result<crate::traits::BootState, ()> {
             Ok(crate::traits::BootState::Idle)
         }
         fn consume_trial(&mut self) -> Result<(), ()> {
+            Ok(())
+        }
+        fn refresh(&mut self, _checksum: u16, _state: crate::traits::BootState) -> Result<(), ()> {
             Ok(())
         }
     }
@@ -278,10 +296,11 @@ mod tests {
         d.dispatch().unwrap();
 
         assert_eq!(d.frame.status, Status::Ok);
-        assert_eq!(d.frame.len, 8);
+        assert_eq!(d.frame.len, 10);
         let info = unsafe { d.frame.data.info };
         assert_eq!({ info.capacity }, 256);
         assert_eq!({ info.payload_size }, TEST_D as u16);
+        assert_eq!({ info.version }, 0);
         assert_eq!({ info.erase_size }, 64);
     }
 

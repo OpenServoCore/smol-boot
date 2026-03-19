@@ -12,24 +12,14 @@ pub enum Duplex {
     Full,
 }
 
+#[derive(Copy, Clone)]
+#[repr(u32)]
 pub enum BaudRate {
-    B9600,
-    B19200,
-    B38400,
-    B57600,
-    B115200,
-}
-
-impl BaudRate {
-    pub fn value(&self) -> u32 {
-        match self {
-            BaudRate::B9600 => 9600,
-            BaudRate::B19200 => 19200,
-            BaudRate::B38400 => 38400,
-            BaudRate::B57600 => 57600,
-            BaudRate::B115200 => 115200,
-        }
-    }
+    B9600 = 9600,
+    B19200 = 19200,
+    B38400 = 38400,
+    B57600 = 57600,
+    B115200 = 115200,
 }
 
 #[derive(Copy, Clone)]
@@ -64,7 +54,7 @@ impl Usart {
     pub const PAYLOAD_SIZE: usize = payload_size(Self::FRAME_SIZE);
 }
 
-impl tinyboot::traits::Transport<{ Usart::PAYLOAD_SIZE }> for Usart {}
+impl tinyboot::traits::boot::Transport<{ Usart::PAYLOAD_SIZE }> for Usart {}
 
 impl Usart {
     pub fn new(config: &UsartConfig) -> Self {
@@ -88,15 +78,15 @@ impl Usart {
         }
 
         // Configure pins
-        gpio::configure(tx_pin, PinMode::AfPushPull);
+        gpio::configure(tx_pin, PinMode::AF_PUSH_PULL);
         if !half_duplex {
-            gpio::configure(rx_pin, PinMode::InputPull(config.rx_pull));
+            gpio::configure(rx_pin, PinMode::input_pull(config.rx_pull));
         }
 
         // Configure TX_EN pin if present (start in RX mode)
         if let Some(ref tx_en) = config.tx_en {
             rcc::enable_gpio(tx_en.pin.port_index());
-            gpio::configure(tx_en.pin, PinMode::OutputPushPull);
+            gpio::configure(tx_en.pin, PinMode::OUTPUT_PUSH_PULL);
             if tx_en.active_high {
                 gpio::set_low(tx_en.pin);
             } else {
@@ -105,7 +95,7 @@ impl Usart {
         }
 
         // Initialize USART
-        usart::init(regs, config.pclk, config.baud.value(), half_duplex);
+        usart::init(regs, config.pclk, config.baud as u32, half_duplex);
 
         Usart {
             regs,

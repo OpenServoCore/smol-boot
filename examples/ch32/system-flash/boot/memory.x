@@ -5,13 +5,11 @@
  * while programming requires the physical address (FLASH).
  *
  * This frees all 16KB of user flash (0x08000000) for the application.
- * Boot metadata (state, trial counter) is stored in the last 64 bytes
- * of system flash.
+ * Boot metadata (state, trial counter) is stored in option bytes (0x1FFFF800).
  */
 MEMORY
 {
-    CODE  : ORIGIN = 0x00000000, LENGTH = 1920 - 64   /* execution alias   */
-    FLASH : ORIGIN = 0x1FFFF000, LENGTH = 1920 - 64   /* physical address  */
-    META  : ORIGIN = 0x1FFFFCC0, LENGTH = 64           /* boot metadata     */
+    CODE  : ORIGIN = 0x00000000,  LENGTH = 4K
+    FLASH : ORIGIN = 0x1FFFF000, LENGTH = 4K
     RAM   : ORIGIN = 0x20000000, LENGTH = 2K
 }

@@ -1,8 +1,6 @@
 use crate::protocol;
-use crate::traits::{BootCtl, BootMetaStore, Platform, Storage, Transport};
-
-#[cfg(feature = "trial-boot")]
 use crate::traits::BootState;
+use crate::traits::boot::{BootCtl, BootMetaStore, Platform, Storage, Transport};
 
 pub struct Core<const D: usize, T, S, B, C>
 where
@@ -29,7 +27,7 @@ where
         log_info!("Bootloader started");
 
         match self.check_boot_state() {
-            Ok(false) => self.platform.ctl.boot_app(),
+            Ok(false) => self.platform.ctl.system_reset(false),
             Ok(true) | Err(_) => self.enter_bootloader(),
         }
     }
@@ -41,31 +39,34 @@ where
             return Ok(true);
         }
 
-        #[cfg(feature = "trial-boot")]
-        {
-            let meta = self.platform.boot_meta.read();
-            match meta.boot_state() {
-                BootState::Idle | BootState::Confirmed => {}
-                BootState::Updating | BootState::Corrupt => return Ok(true),
-                BootState::Validating => {
-                    if meta.trials_remaining() == 0 {
-                        return Ok(true);
-                    }
-                    self.platform.boot_meta.consume_trial()?;
+        match self.platform.boot_meta.boot_state() {
+            BootState::Idle => {
+                if !self.validate_app() {
+                    return Ok(true);
                 }
             }
-        }
-
-        if self.app_is_blank() {
-            return Ok(true);
+            BootState::Updating => return Ok(true),
+            BootState::Validating => {
+                if self.platform.boot_meta.trials_remaining() == 0 {
+                    return Ok(true);
+                }
+                self.platform.boot_meta.consume_trial()?;
+            }
         }
 
         Ok(false)
     }
 
-    fn app_is_blank(&self) -> bool {
+    fn validate_app(&self) -> bool {
+        let stored = self.platform.boot_meta.app_checksum();
+        if stored != 0xFFFF {
+            use tinyboot_protocol::crc::{CRC_INIT, crc16};
+            return crc16(CRC_INIT, self.platform.storage.as_slice()) == stored;
+        }
+        // No CRC stored (virgin/debugger-flashed) — check if app exists
         let data = self.platform.storage.as_slice();
-        data.len() < 4 || data[..4] == [0xFF; 4]
+        data.len() >= 4
+            && unsafe { core::ptr::read_volatile(data.as_ptr() as *const u32) } != 0xFFFF_FFFF
     }
 
     fn enter_bootloader(&mut self) -> ! {

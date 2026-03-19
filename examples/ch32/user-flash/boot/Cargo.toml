@@ -4,8 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-tinyboot-ch32-boot = { path = "../../../../tinyboot-ch32-boot", features = ["ch32v003f4p6", "rt", "defmt", "trial-boot"] }
-tinyboot = { path = "../../../../tinyboot", default-features = false, features = ["defmt", "trial-boot"] }
+tinyboot-ch32-boot = { path = "../../../../tinyboot-ch32-boot", features = ["ch32v003f4p6", "rt", "defmt"] }
 panic-halt = "1.0"
 
 defmt = "1.0"

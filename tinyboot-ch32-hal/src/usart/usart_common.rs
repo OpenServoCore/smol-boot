@@ -1,20 +1,14 @@
 pub fn init(r: ch32_metapac::usart::Usart, pclk: u32, baud: u32, half_duplex: bool) {
-    r.ctlr2().modify(|w| w.set_stop(0b00));
-
-    r.ctlr1().modify(|w| {
-        w.set_m(false);
-        w.set_pce(false);
+    // 8N1: write zeroes all bits (M=0, PCE=0, STOP=0b00), then set TE+RE
+    r.ctlr1().write(|w| {
         w.set_te(true);
         w.set_re(true);
     });
 
-    r.ctlr3().modify(|w| {
-        w.set_rtse(false);
-        w.set_ctse(false);
-        if half_duplex {
-            w.set_hdsel(true);
-        }
-    });
+    // RTSE=0, CTSE=0 are default; only touch CTLR3 for half-duplex
+    if half_duplex {
+        r.ctlr3().modify(|w| w.set_hdsel(true));
+    }
 
     let brr = (pclk + baud / 2) / baud;
     r.brr().write_value(ch32_metapac::usart::regs::Brr(brr));

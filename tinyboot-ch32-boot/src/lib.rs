@@ -6,10 +6,13 @@ pub mod platform;
 mod rt;
 
 pub use platform::{
-    BaudRate, BootCtl, BootCtlConfig, BootMetaStore, Duplex, MetaConfig, Storage, StorageConfig,
-    TxEnConfig, Usart, UsartConfig,
+    BaudRate, BootCtl, BootCtlConfig, BootMetaStore, Duplex, Storage, StorageConfig, TxEnConfig,
+    Usart, UsartConfig,
 };
 
-// Re-export HAL types for convenience
+// Re-exports so boot examples only need this one crate.
+pub use tinyboot::Core;
+pub use tinyboot::traits::boot::Platform;
+pub use tinyboot_ch32_hal::flash::unlock as flash_unlock;
 pub use tinyboot_ch32_hal::gpio::Pull;
 pub use tinyboot_ch32_hal::{Pin, UsartMapping};

@@ -25,14 +25,15 @@ pub struct DeviceInfo {
     pub capacity: u32,
     pub payload_size: u16,
     pub erase_size: u16,
+    pub version: u16,
 }
 
-pub struct FlashClient<T: embedded_io::Read + embedded_io::Write> {
+pub struct Client<T: embedded_io::Read + embedded_io::Write> {
     transport: T,
     frame: Frame<MAX_PAYLOAD>,
 }
 
-impl<T: embedded_io::Read + embedded_io::Write> FlashClient<T> {
+impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
     pub fn new(transport: T) -> Self {
         Self {
             transport,
@@ -71,6 +72,7 @@ impl<T: embedded_io::Read + embedded_io::Write> FlashClient<T> {
         let capacity = { info.capacity };
         let payload_size = { info.payload_size };
         let erase_size = { info.erase_size };
+        let version = { info.version };
 
         if payload_size == 0 || erase_size == 0 || capacity == 0 {
             return Err(FlashError::BadInfo);
@@ -80,6 +82,7 @@ impl<T: embedded_io::Read + embedded_io::Write> FlashClient<T> {
             capacity,
             payload_size,
             erase_size,
+            version,
         })
     }
 
@@ -164,7 +167,7 @@ impl<T: embedded_io::Read + embedded_io::Write> FlashClient<T> {
         }
 
         self.frame.cmd = Cmd::Verify;
-        self.frame.addr = 0;
+        self.frame.addr = fw_size;
         self.frame.len = 0;
         self.transact()?;
 
@@ -176,14 +179,16 @@ impl<T: embedded_io::Read + embedded_io::Write> FlashClient<T> {
             });
         }
 
-        // 5. Reset — tolerate timeout since device resets immediately
+        Ok(info)
+    }
+
+    /// Reset the device. Does not wait for a response since the device resets immediately.
+    /// `bootloader=true` (addr=1): enter bootloader. `bootloader=false` (addr=0): boot app.
+    pub fn reset(&mut self, bootloader: bool) {
         self.frame.cmd = Cmd::Reset;
-        self.frame.addr = 0;
+        self.frame.addr = bootloader as u32;
         self.frame.len = 0;
         self.frame.status = Status::Request;
         let _ = self.frame.send(&mut self.transport);
-        // Don't wait for response — device is resetting
-
-        Ok(info)
     }
 }

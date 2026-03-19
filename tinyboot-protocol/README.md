@@ -32,10 +32,10 @@ Total frame size = 12 bytes overhead + payload. For example, a UART transport wi
 | Code | Name   | Direction      | Description                                               |
 | ---- | ------ | -------------- | --------------------------------------------------------- |
 | 0x01 | Info   | Host to Device | Query device geometry (capacity, payload size, erase size) |
-| 0x02 | Erase  | Host to Device | Erase one page at addr                                    |
+| 0x02 | Erase  | Host to Device | Erase one page at addr (first erase transitions Idle → Updating) |
 | 0x03 | Write  | Host to Device | Write data at address                                     |
-| 0x04 | Verify | Host to Device | Compute CRC16 over app region                             |
-| 0x05 | Reset  | Host to Device | Advance boot state and reset                              |
+| 0x04 | Verify | Host to Device | Compute CRC16, store checksum + Validating state in OB    |
+| 0x05 | Reset  | Host to Device | Reset the device                                          |
 
 ### Info response
 
@@ -99,11 +99,11 @@ Data starts at offset 10 (even-aligned), so `u16` fields in the union variants a
 
 ```
 Host  -> Info request
-Device -> Info response (capacity=16384, payload_size=52, erase_size=64)
+Device -> Info response (capacity=16384, payload_size=52, erase_size=1024)
 
 Host  -> Erase addr=0x0000
 Device -> Ok
-Host  -> Erase addr=0x0040
+Host  -> Erase addr=0x0400
 Device -> Ok
 ...
 

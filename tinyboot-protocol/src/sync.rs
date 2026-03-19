@@ -23,6 +23,22 @@ impl Sync {
             }
         }
     }
+
+    /// Async version of read.
+    pub async fn read_async<R: embedded_io_async::Read>(
+        &mut self,
+        r: &mut R,
+    ) -> Result<(), ReadError> {
+        let mut b = [0u8; 1];
+        loop {
+            r.read(&mut b).await.map_err(|_| ReadError::Io)?;
+            self.0 = self.1;
+            self.1 = b[0];
+            if self.0 == Self::valid().0 && self.1 == Self::valid().1 {
+                return Ok(());
+            }
+        }
+    }
 }
 
 #[cfg(test)]

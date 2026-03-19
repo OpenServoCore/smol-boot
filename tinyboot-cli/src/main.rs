@@ -1,4 +1,4 @@
-mod flash;
+mod client;
 mod transport;
 
 use std::time::Instant;
@@ -9,7 +9,7 @@ use object::elf::{PT_LOAD, SHF_ALLOC};
 use object::read::elf::{ElfFile32, ProgramHeader as _};
 use object::{LittleEndian, Object, ObjectSection, SectionFlags};
 
-use flash::FlashClient;
+use client::Client;
 use transport::Serial;
 
 #[derive(Parser)]
@@ -49,10 +49,26 @@ enum Commands {
         /// Baud rate
         #[arg(long, default_value_t = 115200)]
         baud: u32,
+        /// Reset device after flashing
+        #[arg(long)]
+        reset: bool,
+    },
+    /// Reset the device
+    Reset {
+        /// Serial port (e.g. /dev/ttyUSB0). Auto-detects if omitted.
+        #[arg(long)]
+        port: Option<String>,
+        /// Baud rate
+        #[arg(long, default_value_t = 115200)]
+        baud: u32,
+        /// Reset into bootloader instead of booting app
+        #[arg(long)]
+        bootloader: bool,
     },
 }
 
-/// Probe each available serial port with an Info request, return the first that responds.
+/// Probe each available serial port for a tinyboot device (bootloader or app).
+/// Sends Info — both the bootloader and apps with poll_cmd respond to it.
 fn detect_port(baud: u32) -> Result<String, Box<dyn std::error::Error>> {
     let ports = serialport::available_ports()?;
     if ports.is_empty() {
@@ -65,7 +81,7 @@ fn detect_port(baud: u32) -> Result<String, Box<dyn std::error::Error>> {
         else {
             continue;
         };
-        let mut client = FlashClient::new(Serial(serial));
+        let mut client = Client::new(Serial(serial));
         if client.info().is_ok() {
             eprintln!("detected tinyboot on {}", p.port_name);
             return Ok(p.port_name.clone());
@@ -166,7 +182,11 @@ fn load_firmware(data: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 fn open_serial(port: &str, baud: u32) -> Result<Serial, Box<dyn std::error::Error>> {
     let port = serialport::new(port, baud)
         .timeout(std::time::Duration::from_secs(5))
-        .open()?;
+        .open()
+        .map_err(|e| {
+            eprintln!("serial open error: {e:?}");
+            e
+        })?;
     Ok(Serial(port))
 }
 
@@ -177,16 +197,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Commands::Info { port, baud } => {
             let port = resolve_port(port, baud)?;
             let serial = open_serial(&port, baud)?;
-            let mut client = FlashClient::new(serial);
+            let mut client = Client::new(serial);
             let info = client.info()?;
             println!("capacity:     {} bytes", info.capacity);
             println!("payload_size: {} bytes", info.payload_size);
             println!("erase_size:   {} bytes", info.erase_size);
+            println!("version:      {}", info.version);
         }
         Commands::Erase { port, baud } => {
             let port = resolve_port(port, baud)?;
             let serial = open_serial(&port, baud)?;
-            let mut client = FlashClient::new(serial);
+            let mut client = Client::new(serial);
 
             let pb = ProgressBar::new(0);
             pb.set_style(
@@ -211,12 +232,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             firmware,
             port,
             baud,
+            reset,
         } => {
             let port = resolve_port(port, baud)?;
             let file_data = std::fs::read(&firmware)?;
             let fw = load_firmware(&file_data)?;
             let serial = open_serial(&port, baud)?;
-            let mut client = FlashClient::new(serial);
+            let mut client = Client::new(serial);
 
             let start = Instant::now();
             let pb = ProgressBar::new(0);
@@ -244,6 +266,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 fw.len(),
                 info.capacity,
                 elapsed.as_secs_f64()
+            );
+
+            if reset {
+                client.reset(false); // addr=0: boot app
+                println!("device reset");
+            }
+        }
+        Commands::Reset {
+            port,
+            baud,
+            bootloader,
+        } => {
+            let port = resolve_port(port, baud)?;
+            let serial = open_serial(&port, baud)?;
+            let mut client = Client::new(serial);
+            client.reset(bootloader);
+            println!(
+                "device reset ({})",
+                if bootloader { "bootloader" } else { "app" }
             );
         }
     }

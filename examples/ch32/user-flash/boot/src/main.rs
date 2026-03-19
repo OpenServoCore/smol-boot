@@ -16,9 +16,8 @@
 use defmt_rtt as _;
 use panic_halt as _;
 
-use tinyboot::{Core, traits::Platform};
 use tinyboot_ch32_boot::{
-    BaudRate, BootCtl, BootCtlConfig, BootMetaStore, Duplex, MetaConfig, Pull, Storage,
+    BaudRate, BootCtl, BootCtlConfig, BootMetaStore, Core, Duplex, Platform, Pull, Storage,
     StorageConfig, Usart, UsartConfig, UsartMapping,
 };
 
@@ -32,10 +31,6 @@ const APP_BASE: u32 = 0x0800_1000;
 
 /// Full 12KB available for the application.
 const APP_SIZE: usize = 12 * 1024;
-
-/// Boot metadata at the last 64 bytes of the bootloader's 4KB region.
-/// Must match the META origin in memory.x.
-const META_BASE: u32 = 0x0800_0FC0;
 
 #[unsafe(export_name = "main")]
 fn main() -> ! {
@@ -56,9 +51,7 @@ fn main() -> ! {
         app_base: APP_BASE,
         app_size: APP_SIZE,
     });
-    let boot_meta = BootMetaStore::new(MetaConfig {
-        meta_base: META_BASE,
-    });
+    let boot_meta = BootMetaStore::default();
     let ctl = BootCtl::new(BootCtlConfig {
         app_entry: APP_ENTRY,
     });

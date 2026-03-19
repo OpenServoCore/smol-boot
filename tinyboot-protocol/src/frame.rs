@@ -22,6 +22,7 @@ pub struct InfoData {
     pub capacity: u32,
     pub payload_size: u16,
     pub erase_size: u16,
+    pub version: u16,
 }
 
 /// Typed Verify response data.
@@ -102,7 +103,7 @@ impl<const D: usize> Frame<D> {
         w.write_all(&self.crc)
     }
 
-    /// Read one frame from the transport (blocking).
+    /// Read one frame from the transport.
     ///
     /// Syncs on preamble, reads header + payload, validates CRC.
     pub fn read<R: embedded_io::Read>(&mut self, r: &mut R) -> Result<(), ReadError> {
@@ -132,6 +133,56 @@ impl<const D: usize> Frame<D> {
         r.read_exact(&mut self.crc).map_err(|_| ReadError::Io)?;
 
         // Validate CRC over body
+        if self.crc != crc16(CRC_INIT, self.as_bytes(0, 10 + data_len)).to_le_bytes() {
+            return Err(ReadError::Crc);
+        }
+
+        Ok(())
+    }
+
+    /// Async version of [`send`](Self::send).
+    pub async fn send_async<W: embedded_io_async::Write>(
+        &mut self,
+        w: &mut W,
+    ) -> Result<(), W::Error> {
+        self.sync = Sync::valid();
+        let body_len = 10 + self.len as usize;
+        self.crc = crc16(CRC_INIT, self.as_bytes(0, body_len)).to_le_bytes();
+        w.write_all(self.as_bytes(0, body_len)).await?;
+        w.write_all(&self.crc).await
+    }
+
+    /// Async version of [`read`](Self::read).
+    pub async fn read_async<R: embedded_io_async::Read>(
+        &mut self,
+        r: &mut R,
+    ) -> Result<(), ReadError> {
+        self.sync.read_async(r).await?;
+
+        r.read_exact(self.as_bytes_mut(2, 8))
+            .await
+            .map_err(|_| ReadError::Io)?;
+
+        if !self.cmd.is_valid() || !self.status.is_valid() {
+            return Err(ReadError::InvalidFrame);
+        }
+
+        let data_len = self.len as usize;
+
+        if data_len > D {
+            return Err(ReadError::Overflow);
+        }
+
+        if data_len > 0 {
+            r.read_exact(unsafe { &mut self.data.raw[..data_len] })
+                .await
+                .map_err(|_| ReadError::Io)?;
+        }
+
+        r.read_exact(&mut self.crc)
+            .await
+            .map_err(|_| ReadError::Io)?;
+
         if self.crc != crc16(CRC_INIT, self.as_bytes(0, 10 + data_len)).to_le_bytes() {
             return Err(ReadError::Crc);
         }

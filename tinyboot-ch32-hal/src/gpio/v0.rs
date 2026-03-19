@@ -1,25 +1,39 @@
 use core::convert::Infallible;
 
-use ch32_metapac::gpio::vals::{Cnf, Mode};
-
 use crate::Pin;
 
 #[derive(Copy, Clone)]
-#[allow(dead_code)]
 pub enum Pull {
     None,
     Up,
     Down,
 }
 
-#[allow(dead_code)]
-pub enum PinMode {
-    InputFloating,
-    InputPull(Pull),
-    OutputPushPull,
-    OutputOpenDrain,
-    AfPushPull,
-    AfOpenDrain,
+/// GPIO pin configuration.
+///
+/// Encodes the 4-bit CFGLR field `[MODE(2) | CNF(2)]` directly.
+/// Bit 7 = set ODR high, bit 6 = set ODR low, bits 3:0 = CFGLR nibble.
+#[derive(Copy, Clone)]
+pub struct PinMode(u8);
+
+// MODE bits: INPUT=0b00, OUTPUT_10MHZ=0b01
+// CNF bits (shifted <<2): ANALOG/PP=0b0000, FLOAT/OD=0b0100, PULL/AF_PP=0b1000, AF_OD=0b1100
+impl PinMode {
+    pub const INPUT_FLOATING: Self = Self(0b0100); // MODE=00 CNF=01
+    pub const INPUT_PULL_UP: Self = Self(0b1000 | 0x80); // MODE=00 CNF=10, ODR=1
+    pub const INPUT_PULL_DOWN: Self = Self(0b1000 | 0x40); // MODE=00 CNF=10, ODR=0
+    pub const OUTPUT_PUSH_PULL: Self = Self(0b0001); // MODE=01 CNF=00
+    pub const OUTPUT_OPEN_DRAIN: Self = Self(0b0101); // MODE=01 CNF=01
+    pub const AF_PUSH_PULL: Self = Self(0b1001); // MODE=01 CNF=10
+    pub const AF_OPEN_DRAIN: Self = Self(0b1101); // MODE=01 CNF=11
+
+    pub fn input_pull(pull: Pull) -> Self {
+        match pull {
+            Pull::Up => Self::INPUT_PULL_UP,
+            Pull::Down => Self::INPUT_PULL_DOWN,
+            Pull::None => Self::INPUT_FLOATING,
+        }
+    }
 }
 
 #[inline(always)]
@@ -27,31 +41,16 @@ pub fn configure(pin: Pin, mode: PinMode) {
     let regs = pin.gpio_regs();
     let n = pin.pin_number();
 
-    let (m, cnf, odr) = match mode {
-        PinMode::InputFloating => (Mode::INPUT, Cnf::FLOATING_IN__OPEN_DRAIN_OUT, None),
-        PinMode::InputPull(Pull::Up) => (Mode::INPUT, Cnf::PULL_IN__AF_PUSH_PULL_OUT, Some(true)),
-        PinMode::InputPull(Pull::Down) => {
-            (Mode::INPUT, Cnf::PULL_IN__AF_PUSH_PULL_OUT, Some(false))
-        }
-        PinMode::InputPull(Pull::None) => (Mode::INPUT, Cnf::FLOATING_IN__OPEN_DRAIN_OUT, None),
-        PinMode::OutputPushPull => (Mode::OUTPUT_10MHZ, Cnf::ANALOG_IN__PUSH_PULL_OUT, None),
-        PinMode::OutputOpenDrain => (Mode::OUTPUT_10MHZ, Cnf::FLOATING_IN__OPEN_DRAIN_OUT, None),
-        PinMode::AfPushPull => (Mode::OUTPUT_10MHZ, Cnf::PULL_IN__AF_PUSH_PULL_OUT, None),
-        PinMode::AfOpenDrain => (Mode::OUTPUT_10MHZ, Cnf::AF_OPEN_DRAIN_OUT, None),
-    };
-
-    // Direct read-modify-write to avoid closure extraction.
-    // Each pin occupies 4 bits in CFGLR: [MODE(2) | CNF(2)] at offset n*4.
     let shift = n * 4;
     let mask = !(0xFu32 << shift);
-    let bits = ((m.to_bits() as u32) | ((cnf.to_bits() as u32) << 2)) << shift;
+    let bits = ((mode.0 & 0x0F) as u32) << shift;
     let prev = regs.cfglr().read().0;
     regs.cfglr()
         .write_value(ch32_metapac::gpio::regs::Cfglr(prev & mask | bits));
 
-    if let Some(val) = odr {
+    if mode.0 & 0xC0 != 0 {
         let mut outdr = regs.outdr().read();
-        outdr.set_odr(n, val);
+        outdr.set_odr(n, mode.0 & 0x80 != 0);
         regs.outdr().write_value(outdr);
     }
 }

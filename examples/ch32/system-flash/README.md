@@ -14,10 +14,15 @@ entire 16KB user flash available for applications.
 ```
  System Flash (0x1FFFF000)
  ┌──────────────────────────────┐ 0x1FFFF000
- │  Bootloader code (1856 B)   │
- ├──────────────────────────────┤ 0x1FFFFCC0
- │  Boot metadata (64 B)       │
+ │  Bootloader code (1920 B)   │
  └──────────────────────────────┘ 0x1FFFF780
+
+ Option Bytes (0x1FFFF800)
+ ┌──────────────────────────────┐ 0x1FFFF800
+ │  Chip config (16 B)         │
+ ├──────────────────────────────┤ 0x1FFFF810
+ │  Boot metadata (8 B)        │  state, trials, checksum (4 halfwords)
+ └──────────────────────────────┘ 0x1FFFF818
 
  User Flash (0x08000000)
  ┌──────────────────────────────┐ 0x08000000
@@ -32,39 +37,42 @@ entire 16KB user flash available for applications.
  └──────────────────────────────┘ 0x20000800
 ```
 
-## Boot Metadata Placement
+## Boot Metadata
 
-**Placement rules:**
-- Bootloader must start at the beginning of its flash region.
-- Boot metadata must be in the same flash region as the bootloader.
-- Boot metadata must be exactly 64 bytes, aligned to a 64-byte page boundary.
+Boot metadata (state, trials, checksum) is stored in **option bytes** at
+`0x1FFFF810`. This avoids consuming any system flash or user flash for
+metadata. OB supports 1→0 bit writes for state transitions without erasing.
+
+The chip config halfwords at `0x1FFFF800–0x1FFFF80F` (RDPR, USER, Data, WRPR)
+are preserved across OB erase+rewrite cycles.
+
+> **Warning:** The OB region is 64 bytes, but only the first 16 bytes are
+> documented for chip config. The remaining bytes (`0x1FFFF810+`) default to
+> `0xFF` and are writable — so we took the liberty to commandeer 8 of them
+> for boot metadata. If your application also manipulates option bytes
+> (e.g. via the OB erase command), preserve the halfwords at
+> `0x1FFFF810–0x1FFFF817` or the bootloader will lose its state.
+
+## Boot State Machine
+
+| State | Value | Boot Action |
+|-------|-------|-------------|
+| Idle | 0xFF | Validate app (CRC or blank check) → boot or enter bootloader |
+| Updating | 0x7F | Enter bootloader (transfer was interrupted) |
+| Validating | 0x3F | Consume trial, boot app |
+
+**Lifecycle:**
+1. First Erase command → Idle (0xFF) → Updating (0x7F)
+2. Verify command → writes Validating (0x3F) + checksum to OB
+3. Reset → bootloader sees Validating, consumes trial, boots app
+4. App confirms → full OB refresh back to Idle with checksum preserved
 
 ## Boot Request Mechanism
 
 Uses the hardware `BOOT_MODE` register in the CH32V003 flash controller
-(`STATR`). The app sets this bit and triggers a soft reset to re-enter the
-bootloader. No RAM reservation is needed.
-
-## Features & Flash Size Impact
-
-The system flash budget is **1856 bytes** (1920 - 64 for metadata). Every
-feature and configuration choice matters at this scale.
-
-| Configuration            | Approximate Size | Notes                            |
-|--------------------------|------------------|----------------------------------|
-| Base bootloader          | ~1708 B          | Full-duplex USART, RS-485 tx_en  |
-| + `defmt` logging        | —                | Does not fit in system flash     |
-| + `trial-boot`           | —                | Does not fit in system flash     |
-| - RS-485 `tx_en`         | Saves ~44 B      | Remove if not using RS-485       |
-| - `rx_pull`              | Saves ~8 B       | Use `Pull::None` if not needed   |
-| Half-duplex USART        | Saves ~20 B      | Single-wire mode                 |
-
-To stay within the 1856-byte budget:
-
-- **No defmt** — logging infrastructure alone exceeds the available space.
-- **No trial-boot** — the state machine adds too much code.
-- Minimize USART configuration (remove `tx_en` if not using RS-485).
-- Build with `opt-level = "z"` and `lto = true` (set in workspace profile).
+(`STATR` bit 14). The app sets this bit and triggers a soft reset to re-enter
+the bootloader. The bootloader clears RMVF and BOOT_MODE before booting the
+app so the next reset goes to user flash.
 
 ## Building
 
@@ -83,8 +91,10 @@ wlink reads the ELF directly and uses the LMA for placement — no objcopy neede
 
 ```sh
 # Flash bootloader to system flash
-wlink flash --chip CH32V003 target/riscv32ec-unknown-none-elf/release/boot
+wlink flash target/riscv32ec-unknown-none-elf/release/boot
 
-# Flash app to user flash (wlink or probe-rs both work)
-wlink flash --chip CH32V003 target/riscv32ec-unknown-none-elf/release/app
+# Erase user flash and power cycle, then flash app via tinyboot-cli
+wlink erase
+# (power cycle)
+tinyboot flash --reset --port /dev/ttyACM0 target/riscv32ec-unknown-none-elf/release/app
 ```

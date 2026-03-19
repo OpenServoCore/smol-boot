@@ -6,33 +6,27 @@
 //!
 //! The `system-flash` feature uses the hardware BOOT_MODE register to signal
 //! boot requests across resets (no RAM reservation needed).
+//! Boot metadata is stored in option bytes (0x1FFFF800).
 
 #![no_std]
 #![no_main]
 
 use panic_halt as _;
 
-use tinyboot::{Core, traits::Platform};
 use tinyboot_ch32_boot::{
-    BaudRate, BootCtl, BootCtlConfig, BootMetaStore, Duplex, MetaConfig, Pull, Storage,
+    BaudRate, BootCtl, BootCtlConfig, BootMetaStore, Core, Duplex, Platform, Pull, Storage,
     StorageConfig, Usart, UsartConfig, UsartMapping,
 };
 
-// --- Flash layout (must match memory.x) ---
+// --- Flash layout ---
 
-/// Application is stored in user flash. The CH32V003 FPEC requires
-/// 0x0800_0000-based addresses for programming operations.
 const APP_BASE: u32 = 0x0800_0000;
-
-/// Full 16KB of user flash is available for the app.
 const APP_SIZE: usize = 16 * 1024;
-
-/// Boot metadata lives at the end of system flash (last 64 bytes).
-/// Must match the META origin in memory.x.
-const META_BASE: u32 = 0x1FFF_FCC0;
 
 #[unsafe(export_name = "main")]
 fn main() -> ! {
+    tinyboot_ch32_boot::flash_unlock();
+
     // Configure USART transport for firmware updates.
     // Adjust mapping, pins, and baud rate to match your hardware.
     let transport = Usart::new(&UsartConfig {
@@ -48,9 +42,7 @@ fn main() -> ! {
         app_base: APP_BASE,
         app_size: APP_SIZE,
     });
-    let boot_meta = BootMetaStore::new(MetaConfig {
-        meta_base: META_BASE,
-    });
+    let boot_meta = BootMetaStore::default();
     let ctl = BootCtl::new(BootCtlConfig {});
 
     let platform = Platform::new(transport, storage, boot_meta, ctl);

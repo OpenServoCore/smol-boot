@@ -4,7 +4,7 @@ mod storage;
 mod transport;
 
 pub use boot_ctl::{BootCtl, BootCtlConfig};
-pub use boot_state::{BootMetaStore, MetaConfig};
+pub use boot_state::BootMetaStore;
 pub use storage::{Storage, StorageConfig};
 pub use tinyboot_ch32_hal::gpio::Pull;
 pub use tinyboot_ch32_hal::{Pin, UsartMapping};

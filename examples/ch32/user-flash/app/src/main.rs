@@ -14,20 +14,14 @@
 use defmt_rtt as _;
 use panic_halt as _;
 
-use tinyboot::traits::BootClient;
-
-/// Boot metadata at the last 64 bytes of the bootloader's 4KB region.
-/// Must match the bootloader's META_BASE (see boot/memory.x).
-const META_BASE: u32 = 0x0800_0FC0;
+use tinyboot_ch32_app::traits::BootClient;
 
 #[qingke_rt::entry]
 fn main() -> ! {
     // Confirm successful boot to the bootloader's trial-boot FSM.
     // This advances the boot state from Validating -> Confirmed.
     // Safe to call unconditionally; it's a no-op if not in Validating state.
-    let mut client = tinyboot_ch32_app::BootClient::new(tinyboot_ch32_app::BootClientConfig {
-        meta_base: META_BASE,
-    });
+    let mut client = tinyboot_ch32_app::BootClient::default();
     client.confirm();
 
     defmt::info!("Hello from app!");

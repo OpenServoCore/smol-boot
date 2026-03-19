@@ -1,0 +1,35 @@
+pub mod app;
+pub mod boot;
+
+// Shared types used by both boot and app.
+
+/// Current stage in the firmware update lifecycle.
+///
+/// Each state is a contiguous run of 1-bits from bit 0.
+/// Advancing clears the MSB: `next = state & (state >> 1)`.
+///
+/// ```text
+/// 0xFF  Idle        (8 ones)
+/// 0x7F  Updating    (7 ones)
+/// 0x3F  Validating  (6 ones)
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u8)]
+pub enum BootState {
+    /// No update in progress. Normal app boot. Erased flash default.
+    Idle = 0xFF,
+    /// Firmware transfer in progress.
+    Updating = 0x7F,
+    /// New firmware written, trial booting the app.
+    Validating = 0x3F,
+}
+
+impl BootState {
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            0xFF | 0x7F | 0x3F => unsafe { core::mem::transmute::<u8, BootState>(v) },
+            _ => BootState::Idle,
+        }
+    }
+}

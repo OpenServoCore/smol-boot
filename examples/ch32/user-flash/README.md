@@ -3,8 +3,7 @@
 Bootloader hosted in user flash alongside the application. The 16KB user flash
 is partitioned between the bootloader (4KB) and the application (12KB).
 
-This configuration has more room for features — defmt logging and trial-boot
-are both enabled.
+This configuration has more room for features — defmt logging is enabled.
 
 > **Note:** User-flash mode is primarily useful for debugging, since it
 > allows enabling defmt and other features that don't fit in system flash.
@@ -17,14 +16,19 @@ are both enabled.
 ```
  User Flash (0x08000000)
  ┌──────────────────────────────┐ 0x08000000
- │  Bootloader code (4KB - 64) │
- ├──────────────────────────────┤ 0x08000FC0
- │  Boot metadata (64 B)       │
+ │  Bootloader code (4KB)      │
  ├──────────────────────────────┤ 0x08001000
  │                              │
  │  Application (12KB)          │
  │                              │
  └──────────────────────────────┘ 0x08004000
+
+ Option Bytes (0x1FFFF800)
+ ┌──────────────────────────────┐ 0x1FFFF800
+ │  Chip config (16 B)         │
+ ├──────────────────────────────┤ 0x1FFFF810
+ │  Boot metadata (8 B)        │  state, trials, checksum (4 halfwords)
+ └──────────────────────────────┘ 0x1FFFF818
 
  RAM (0x20000000)
  ┌──────────────────────────────┐ 0x20000000
@@ -33,6 +37,17 @@ are both enabled.
  │  Data / BSS / Stack (2KB-4) │
  └──────────────────────────────┘ 0x20000800
 ```
+
+## Boot Metadata
+
+Boot metadata (state, trials, checksum) is stored in **option bytes** at
+`0x1FFFF810`, shared with the system-flash example. This avoids consuming
+user flash for metadata.
+
+> **Warning:** The OB bytes at `0x1FFFF810–0x1FFFF817` are spare space in
+> the 64-byte OB region — we took the liberty to commandeer them for boot
+> metadata. If your application manipulates option bytes directly, preserve
+> these halfwords or the bootloader will lose its state.
 
 ## Boot Request Mechanism
 
@@ -45,36 +60,6 @@ Both the bootloader and the app must link `boot_request.x` to reserve this
 word. The bootloader's `link.x` includes it directly; the app links it via
 `-Tboot_request.x` in its `build.rs`.
 
-## Features & Flash Size Impact
-
-The bootloader budget here is **4032 bytes** (4KB - 64 for metadata). The
-current configuration uses ~3116 bytes, leaving headroom for additional
-features.
-
-| Configuration            | Approximate Size | Notes                            |
-|--------------------------|------------------|----------------------------------|
-| Base (defmt + trial-boot)| ~3116 B          | Current example configuration    |
-| - `defmt` logging        | Saves ~1000 B    | Removes RTT + format strings     |
-| - `trial-boot`           | Saves ~200 B     | Removes boot state machine       |
-| + RS-485 `tx_en`         | Adds ~44 B       | Uncomment in UsartConfig         |
-| + `rx_pull: Pull::Up`    | Adds ~8 B        | Internal pull-up on RX pin       |
-
-### Adjusting the partition
-
-The 4KB/12KB split can be adjusted by changing:
-
-1. `boot/memory.x` — `CODE`, `FLASH`, and `META` regions
-2. `boot/src/main.rs` — `APP_BASE`, `APP_SIZE`, and `META_BASE` constants
-3. `app/memory.x` — `FLASH` origin and length
-
-All three must agree. The bootloader partition must be aligned to the flash
-erase size (64 bytes on CH32V003).
-
-**Placement rules:**
-- Bootloader must start at the beginning of its flash region.
-- Boot metadata must be in the same flash region as the bootloader.
-- Boot metadata must be exactly 64 bytes, aligned to a 64-byte page boundary.
-
 ## Building
 
 ```sh
@@ -84,17 +69,10 @@ cargo build -p app --release
 
 ## Flashing
 
-Both the bootloader and app must be flashed with
-[wlink](https://github.com/ch32-rs/wlink) because probe-rs does not support the
-VMA/LMA split used by the bootloader's linker script, and the app starts at a
-non-zero offset that probe-rs doesn't expect.
-
-wlink reads the ELF directly and uses the LMA for placement — no objcopy needed.
-
 ```sh
 # Flash bootloader
-wlink flash --chip CH32V003 target/riscv32ec-unknown-none-elf/release/boot
+wlink flash target/riscv32ec-unknown-none-elf/release/boot
 
-# Flash app
-wlink flash --chip CH32V003 target/riscv32ec-unknown-none-elf/release/app
+# Flash app via tinyboot-cli
+tinyboot flash --reset --port /dev/ttyACM0 target/riscv32ec-unknown-none-elf/release/app
 ```

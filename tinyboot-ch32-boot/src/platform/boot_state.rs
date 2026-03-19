@@ -1,13 +1,6 @@
-use tinyboot::traits::{BootMeta, BootMetaStore as TBBootMetaStore, BootState};
-
-use tinyboot_ch32_hal::flash::FlashWriter;
-
-const STATE_OFFSET: u32 = 0;
-const TRIALS_OFFSET: u32 = 2;
-
-pub struct MetaConfig {
-    pub meta_base: u32,
-}
+use tinyboot::traits::BootState;
+use tinyboot::traits::boot::BootMetaStore as TBBootMetaStore;
+use tinyboot_ch32_hal::flash;
 
 #[derive(Debug)]
 pub enum BootMetaError {
@@ -15,61 +8,37 @@ pub enum BootMetaError {
     TrialsExhausted,
 }
 
-pub struct BootMetaStore {
-    meta_base: u32,
-}
-
-impl BootMetaStore {
-    pub fn new(config: MetaConfig) -> Self {
-        BootMetaStore {
-            meta_base: config.meta_base,
-        }
-    }
-
-    fn meta_ptr(&self) -> *const BootMeta {
-        self.meta_base as *const BootMeta
-    }
-
-    fn patch_u16(&mut self, offset: u32, value: u16) {
-        #[cfg(feature = "system-flash")]
-        let writer = FlashWriter::system();
-        #[cfg(not(feature = "system-flash"))]
-        let writer = FlashWriter::standard();
-        writer.write_halfword(self.meta_base + offset, value);
-    }
-
-    fn read_u16(&self, offset: u32) -> u16 {
-        unsafe { core::ptr::read_volatile((self.meta_base + offset) as *const u16) }
-    }
-
-    fn step_down(&mut self, offset: u32, floor: u16) -> Option<u16> {
-        let current = self.read_u16(offset);
-        if current <= floor {
-            return None;
-        }
-        let next = current & (current >> 1);
-        self.patch_u16(offset, next);
-        Some(next)
-    }
-}
+#[derive(Default)]
+pub struct BootMetaStore;
 
 impl TBBootMetaStore for BootMetaStore {
     type Error = BootMetaError;
 
-    fn read(&self) -> BootMeta {
-        unsafe { core::ptr::read_volatile(self.meta_ptr()) }
+    fn boot_state(&self) -> BootState {
+        BootState::from_u8(flash::ob_boot_state())
+    }
+
+    fn trials_remaining(&self) -> u8 {
+        flash::ob_trials().count_ones() as u8
+    }
+
+    fn app_checksum(&self) -> u16 {
+        flash::ob_checksum()
     }
 
     fn advance(&mut self) -> Result<BootState, Self::Error> {
-        let next = self
-            .step_down(STATE_OFFSET, BootState::Confirmed as u16)
+        let next = flash::ob_step_down(flash::OB_STATE_ADDR, BootState::Validating as u8)
             .ok_or(BootMetaError::InvalidTransition)?;
-        Ok(BootState::from_u16(next))
+        Ok(BootState::from_u8(next))
     }
 
     fn consume_trial(&mut self) -> Result<(), Self::Error> {
-        self.step_down(TRIALS_OFFSET, 0)
-            .ok_or(BootMetaError::TrialsExhausted)?;
+        flash::ob_step_down(flash::OB_TRIALS_ADDR, 0).ok_or(BootMetaError::TrialsExhausted)?;
+        Ok(())
+    }
+
+    fn refresh(&mut self, checksum: u16, state: BootState) -> Result<(), Self::Error> {
+        flash::ob_refresh(state as u8, checksum);
         Ok(())
     }
 }

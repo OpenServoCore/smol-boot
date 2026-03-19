@@ -1,7 +1,7 @@
 use embedded_storage::nor_flash::{
     ErrorType, NorFlash, NorFlashError, NorFlashErrorKind, ReadNorFlash,
 };
-use tinyboot::traits::Storage as StorageTrait;
+use tinyboot::traits::boot::Storage as StorageTrait;
 
 use tinyboot_ch32_hal::flash::FlashWriter;
 
@@ -69,7 +69,7 @@ impl NorFlash for Storage {
         let mut addr = self.app_base + from;
         let end = self.app_base + to;
         while addr < end {
-            writer.erase_page(addr);
+            writer.erase(addr);
             addr += FLASH_ERASE_SIZE as u32;
         }
         #[cfg(debug_assertions)]
@@ -92,7 +92,7 @@ impl NorFlash for Storage {
         let mut addr = self.app_base + offset;
         for pair in bytes.chunks_exact(2) {
             let halfword = u16::from_le_bytes([pair[0], pair[1]]);
-            writer.write_halfword(addr, halfword);
+            writer.write(addr, halfword);
             addr += 2;
         }
         #[cfg(debug_assertions)]

@@ -8,10 +8,14 @@ license.workspace = true
 [dependencies]
 tinyboot-ch32-hal = { path = "../tinyboot-ch32-hal", default-features = false }
 tinyboot = { path = "../tinyboot", default-features = false }
+tinyboot-protocol = { path = "../tinyboot-protocol" }
+embedded-io = { workspace = true }
+embedded-io-async = { workspace = true }
 critical-section = "1.2"
+defmt = { workspace = true, optional = true }
 
 [features]
 default = ["ch32v003f4p6"]
 ch32v003f4p6 = ["tinyboot-ch32-hal/ch32v003f4p6"]
 system-flash = ["tinyboot-ch32-hal/system-flash"]
-trial-boot = []
+defmt = ["dep:defmt"]

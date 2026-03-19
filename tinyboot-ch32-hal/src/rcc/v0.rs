@@ -1,10 +1,8 @@
 pub fn enable_gpio(port_index: usize) {
-    ch32_metapac::RCC.apb2pcenr().modify(|w| match port_index {
-        0 => w.set_iopaen(true),
-        2 => w.set_iopcen(true),
-        3 => w.set_iopden(true),
-        _ => {}
-    });
+    // IOPxEN bits are consecutive starting at bit 2: IOPA=2, IOPB=3, IOPC=4, IOPD=5.
+    ch32_metapac::RCC
+        .apb2pcenr()
+        .modify(|w| w.0 |= 1 << (2 + port_index));
 }
 
 pub fn enable_afio() {
