@@ -15,7 +15,7 @@ impl Sync {
     pub fn read<R: embedded_io::Read>(&mut self, r: &mut R) -> Result<(), ReadError> {
         let mut b = [0u8; 1];
         loop {
-            r.read(&mut b).map_err(|_| ReadError::Io)?;
+            r.read(&mut b).map_err(|_| ReadError)?;
             self.0 = self.1;
             self.1 = b[0];
             if self.0 == Self::valid().0 && self.1 == Self::valid().1 {
@@ -31,7 +31,7 @@ impl Sync {
     ) -> Result<(), ReadError> {
         let mut b = [0u8; 1];
         loop {
-            r.read(&mut b).await.map_err(|_| ReadError::Io)?;
+            r.read(&mut b).await.map_err(|_| ReadError)?;
             self.0 = self.1;
             self.1 = b[0];
             if self.0 == Self::valid().0 && self.1 == Self::valid().1 {

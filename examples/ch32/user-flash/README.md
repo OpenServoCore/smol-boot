@@ -16,11 +16,17 @@ This configuration has more room for features — defmt logging is enabled.
 ```
  User Flash (0x08000000)
  ┌──────────────────────────────┐ 0x08000000
- │  Bootloader code (4KB)      │
+ │  Bootloader code (4KB-66)   │
+ ├──────────────────────────────┤ 0x08000FBE
+ │  Boot version (2 B)         │
+ ├──────────────────────────────┤ 0x08000FC0
+ │  Boot metadata (64 B)       │
  ├──────────────────────────────┤ 0x08001000
  │                              │
- │  Application (12KB)          │
+ │  Application (12KB - 2)      │
  │                              │
+ ├──────────────────────────────┤ 0x08003FFE
+ │  App version (2 B)           │
  └──────────────────────────────┘ 0x08004000
 
  Option Bytes (0x1FFFF800)

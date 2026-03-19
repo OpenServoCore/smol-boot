@@ -9,7 +9,7 @@
       "initialization_options": {
         "cargo": {
           "target": "riscv32imc-unknown-none-elf",
-          "features": ["ch32v003f4p6", "bootloader"]
+          "features": ["ch32v003f4p6", "system-flash"]
         },
         "check": {
           "command": "clippy",

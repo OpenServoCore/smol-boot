@@ -2,24 +2,24 @@ use crate::protocol;
 use crate::traits::BootState;
 use crate::traits::boot::{BootCtl, BootMetaStore, Platform, Storage, Transport};
 
-pub struct Core<const D: usize, T, S, B, C>
+pub struct Core<T, S, B, C>
 where
-    T: Transport<D>,
+    T: Transport,
     S: Storage,
     B: BootMetaStore,
     C: BootCtl,
 {
-    platform: Platform<D, T, S, B, C>,
+    platform: Platform<T, S, B, C>,
 }
 
-impl<const D: usize, T, S, B, C> Core<D, T, S, B, C>
+impl<T, S, B, C> Core<T, S, B, C>
 where
-    T: Transport<D>,
+    T: Transport,
     S: Storage,
     B: BootMetaStore,
     C: BootCtl,
 {
-    pub fn new(platform: Platform<D, T, S, B, C>) -> Self {
+    pub fn new(platform: Platform<T, S, B, C>) -> Self {
         Core { platform }
     }
 
@@ -35,16 +35,11 @@ where
     fn check_boot_state(&mut self) -> Result<bool, B::Error> {
         if self.platform.ctl.is_boot_requested() {
             log_info!("Boot requested");
-            self.platform.boot_meta.advance()?;
             return Ok(true);
         }
 
         match self.platform.boot_meta.boot_state() {
-            BootState::Idle => {
-                if !self.validate_app() {
-                    return Ok(true);
-                }
-            }
+            BootState::Idle => {}
             BootState::Updating => return Ok(true),
             BootState::Validating => {
                 if self.platform.boot_meta.trials_remaining() == 0 {
@@ -52,6 +47,10 @@ where
                 }
                 self.platform.boot_meta.consume_trial()?;
             }
+        }
+
+        if !self.validate_app() {
+            return Ok(true);
         }
 
         Ok(false)
@@ -71,6 +70,7 @@ where
 
     fn enter_bootloader(&mut self) -> ! {
         log_info!("Entering bootloader mode");
+        self.platform.storage.unlock();
 
         let mut d = protocol::Dispatcher::new(&mut self.platform);
 

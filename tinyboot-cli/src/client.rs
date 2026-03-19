@@ -1,9 +1,6 @@
 use tinyboot_protocol::crc::{CRC_INIT, crc16};
-use tinyboot_protocol::frame::Frame;
+use tinyboot_protocol::frame::{EraseData, Frame, MAX_PAYLOAD};
 use tinyboot_protocol::{Cmd, Status};
-
-/// Max payload buffer on the host side. Large enough for any transport.
-const MAX_PAYLOAD: usize = 256;
 
 #[derive(Debug, thiserror::Error)]
 pub enum FlashError {
@@ -23,14 +20,15 @@ pub enum FlashError {
 #[derive(Debug, Clone, Copy)]
 pub struct DeviceInfo {
     pub capacity: u32,
-    pub payload_size: u16,
     pub erase_size: u16,
-    pub version: u16,
+    pub boot_version: u16,
+    pub app_version: u16,
+    pub mode: u16,
 }
 
 pub struct Client<T: embedded_io::Read + embedded_io::Write> {
     transport: T,
-    frame: Frame<MAX_PAYLOAD>,
+    frame: Frame,
 }
 
 impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
@@ -47,10 +45,14 @@ impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
         self.frame
             .send(&mut self.transport)
             .map_err(|_| FlashError::Io)?;
-        self.frame
+        let parse_status = self
+            .frame
             .read(&mut self.transport)
             .map_err(|_| FlashError::Io)?;
 
+        if parse_status != Status::Ok {
+            return Err(FlashError::Device(parse_status));
+        }
         match self.frame.status {
             Status::Ok => Ok(()),
             status => Err(FlashError::Device(status)),
@@ -70,19 +72,21 @@ impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
 
         let info = unsafe { self.frame.data.info };
         let capacity = { info.capacity };
-        let payload_size = { info.payload_size };
         let erase_size = { info.erase_size };
-        let version = { info.version };
+        let boot_version = { info.boot_version };
+        let app_version = { info.app_version };
+        let mode = { info.mode };
 
-        if payload_size == 0 || erase_size == 0 || capacity == 0 {
+        if erase_size == 0 || capacity == 0 {
             return Err(FlashError::BadInfo);
         }
 
         Ok(DeviceInfo {
             capacity,
-            payload_size,
             erase_size,
-            version,
+            boot_version,
+            app_version,
+            mode,
         })
     }
 
@@ -93,13 +97,20 @@ impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
     ) -> Result<DeviceInfo, FlashError> {
         let info = self.info()?;
         let erase_size = info.erase_size as u32;
-        let pages = info.capacity.div_ceil(erase_size);
-        for i in 0..pages {
+        let capacity = info.capacity;
+        let mut addr = 0u32;
+        while addr < capacity {
+            let byte_count = (capacity - addr).min(u16::MAX as u32);
+            let byte_count = byte_count - (byte_count % erase_size);
             self.frame.cmd = Cmd::Erase;
-            self.frame.addr = i * erase_size;
-            self.frame.len = 0;
+            self.frame.addr = addr;
+            self.frame.len = 2;
+            self.frame.data.erase = EraseData {
+                byte_count: byte_count as u16,
+            };
             self.transact()?;
-            on_progress(i + 1, pages);
+            addr += byte_count;
+            on_progress(addr, capacity);
         }
         Ok(info)
     }
@@ -124,25 +135,30 @@ impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
         }
 
         let erase_size = info.erase_size as u32;
-        let payload_size = info.payload_size as usize;
 
-        // 2. Erase — page by page
-        let pages = fw_size.div_ceil(erase_size);
-        for i in 0..pages {
-            let addr = i * erase_size;
+        // 2. Erase — bulk
+        let erase_total = fw_size.next_multiple_of(erase_size);
+        let mut erase_addr = 0u32;
+        while erase_addr < erase_total {
+            let byte_count = (erase_total - erase_addr).min(u16::MAX as u32);
+            let byte_count = byte_count - (byte_count % erase_size);
             self.frame.cmd = Cmd::Erase;
-            self.frame.addr = addr;
-            self.frame.len = 0;
+            self.frame.addr = erase_addr;
+            self.frame.len = 2;
+            self.frame.data.erase = EraseData {
+                byte_count: byte_count as u16,
+            };
             self.transact()?;
-            on_progress("Erasing", i + 1, pages);
+            erase_addr += byte_count;
+            on_progress("Erasing", erase_addr, erase_total);
         }
 
-        // 3. Write — chunk by payload_size
-        let total_chunks = firmware.len().div_ceil(payload_size) as u32;
+        // 3. Write — chunk by MAX_PAYLOAD
+        let total_chunks = firmware.len().div_ceil(MAX_PAYLOAD) as u32;
         let mut offset = 0usize;
         let mut chunk_idx = 0u32;
         while offset < firmware.len() {
-            let end = (offset + payload_size).min(firmware.len());
+            let end = (offset + MAX_PAYLOAD).min(firmware.len());
             let chunk = &firmware[offset..end];
             self.frame.cmd = Cmd::Write;
             self.frame.addr = offset as u32;

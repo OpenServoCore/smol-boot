@@ -53,6 +53,14 @@ enum Commands {
         #[arg(long)]
         reset: bool,
     },
+    /// Convert ELF to flat binary (same extraction as flash)
+    Bin {
+        /// Input ELF or binary file
+        firmware: String,
+        /// Output .bin file
+        #[arg(short, long)]
+        output: String,
+    },
     /// Reset the device
     Reset {
         /// Serial port (e.g. /dev/ttyUSB0). Auto-detects if omitted.
@@ -200,14 +208,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let mut client = Client::new(serial);
             let info = client.info()?;
             println!("capacity:     {} bytes", info.capacity);
-            println!("payload_size: {} bytes", info.payload_size);
             println!("erase_size:   {} bytes", info.erase_size);
-            println!("version:      {}", info.version);
+            let (bm, bn, bp) = tinyboot_protocol::unpack_version(info.boot_version);
+            let (am, an, ap) = tinyboot_protocol::unpack_version(info.app_version);
+            if info.boot_version == 0xFFFF {
+                println!("boot_version: none");
+            } else {
+                println!("boot_version: {bm}.{bn}.{bp}");
+            }
+            if info.app_version == 0xFFFF {
+                println!("app_version:  none");
+            } else {
+                println!("app_version:  {am}.{an}.{ap}");
+            }
+            println!(
+                "mode:         {}",
+                if info.mode == 0 { "bootloader" } else { "app" }
+            );
         }
         Commands::Erase { port, baud } => {
             let port = resolve_port(port, baud)?;
             let serial = open_serial(&port, baud)?;
             let mut client = Client::new(serial);
+
+            let info = client.info()?;
+            if info.mode != 0 {
+                return Err("device is running the app, not the bootloader. Run `tinyboot reset --bootloader` first.".into());
+            }
 
             let pb = ProgressBar::new(0);
             pb.set_style(
@@ -228,6 +255,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 info.capacity / info.erase_size as u32
             );
         }
+        Commands::Bin { firmware, output } => {
+            let file_data = std::fs::read(&firmware)?;
+            let fw = load_firmware(&file_data)?;
+            std::fs::write(&output, &fw)?;
+            println!("{} bytes written to {output}", fw.len());
+        }
         Commands::Flash {
             firmware,
             port,
@@ -239,6 +272,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let fw = load_firmware(&file_data)?;
             let serial = open_serial(&port, baud)?;
             let mut client = Client::new(serial);
+
+            let info = client.info()?;
+            if info.mode != 0 {
+                return Err("device is running the app, not the bootloader. Run `tinyboot reset --bootloader` first.".into());
+            }
 
             let start = Instant::now();
             let pb = ProgressBar::new(0);

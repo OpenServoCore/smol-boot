@@ -8,14 +8,12 @@
  * FLASH is the programming address (FPEC requires 0x08000000-based addresses).
  *
  * Flash map:
- *   0x0800_0000 .. 0x0800_0FBF  bootloader  (4KB - 64)
- *   0x0800_0FC0 .. 0x0800_0FFF  boot meta   (64 bytes)
- *   0x0800_1000 .. 0x0800_3FFF  application (12KB)
+ *   0x0800_0000 .. 0x0800_0FFF  bootloader  4KB
+ *   0x0800_1000 .. 0x0800_3FFF  application 12KB
  */
 MEMORY
 {
-    CODE  : ORIGIN = 0x00000000, LENGTH = 4K - 64  /* execution alias   */
-    FLASH : ORIGIN = 0x08000000, LENGTH = 4K - 64  /* physical address  */
-    META  : ORIGIN = 0x08000FC0, LENGTH = 64       /* boot metadata     */
+    CODE  : ORIGIN = 0x00000000, LENGTH = 4K  /* execution alias   */
+    FLASH : ORIGIN = 0x08000000, LENGTH = 4K  /* physical address  */
     RAM   : ORIGIN = 0x20000000, LENGTH = 2K
 }

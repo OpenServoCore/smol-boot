@@ -44,7 +44,9 @@ pub fn ob_step_down(addr: u32, floor: u8) -> Option<u8> {
     }
     let next = current & (current >> 1);
     let writer = FlashWriter::ob();
+    writer.write_start();
     writer.write(addr, next as u16);
+    writer.operation_end();
     Some(next)
 }
 
@@ -62,10 +64,14 @@ pub fn ob_refresh(state: u8, checksum: u16) {
     buf[11] = cksum[1];
 
     let writer = FlashWriter::ob();
+    writer.erase_start();
     writer.erase(OB_BASE);
+    writer.operation_end();
+    writer.write_start();
     for (i, &byte) in buf.iter().enumerate() {
         if byte != 0xFF {
             writer.write(OB_BASE + (i as u32 * 2), byte as u16);
         }
     }
+    writer.operation_end();
 }

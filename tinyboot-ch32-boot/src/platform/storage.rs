@@ -6,9 +6,11 @@ use tinyboot::traits::boot::Storage as StorageTrait;
 use tinyboot_ch32_hal::flash::FlashWriter;
 
 const FLASH_WRITE_SIZE: usize = 2;
-const FLASH_ERASE_SIZE: usize = 1024;
+const FLASH_ERASE_SIZE: usize = 64;
 
 pub struct StorageConfig {
+    pub boot_base: u32,
+    pub boot_size: u32,
     pub app_base: u32,
     pub app_size: usize,
 }
@@ -31,6 +33,8 @@ impl NorFlashError for StorageError {
 }
 
 pub struct Storage {
+    boot_base: u32,
+    boot_size: u32,
     app_base: u32,
     app_size: usize,
 }
@@ -38,6 +42,8 @@ pub struct Storage {
 impl Storage {
     pub fn new(config: StorageConfig) -> Self {
         Storage {
+            boot_base: config.boot_base,
+            boot_size: config.boot_size,
             app_base: config.app_base,
             app_size: config.app_size,
         }
@@ -66,12 +72,14 @@ impl NorFlash for Storage {
             return Err(StorageError::OutOfBounds);
         }
         let writer = FlashWriter::standard();
+        writer.erase_start();
         let mut addr = self.app_base + from;
         let end = self.app_base + to;
         while addr < end {
             writer.erase(addr);
             addr += FLASH_ERASE_SIZE as u32;
         }
+        writer.operation_end();
         #[cfg(debug_assertions)]
         if writer.check_wrprterr() {
             return Err(StorageError::Protected);
@@ -89,12 +97,15 @@ impl NorFlash for Storage {
             return Err(StorageError::OutOfBounds);
         }
         let writer = FlashWriter::standard();
+        writer.write_start();
         let mut addr = self.app_base + offset;
         for pair in bytes.chunks_exact(2) {
             let halfword = u16::from_le_bytes([pair[0], pair[1]]);
             writer.write(addr, halfword);
             addr += 2;
         }
+        writer.operation_end();
+
         #[cfg(debug_assertions)]
         if writer.check_wrprterr() {
             return Err(StorageError::Protected);
@@ -106,6 +117,18 @@ impl NorFlash for Storage {
 impl StorageTrait for Storage {
     fn as_slice(&self) -> &[u8] {
         unsafe { core::slice::from_raw_parts(self.app_ptr(), self.app_size) }
+    }
+
+    fn boot_base(&self) -> usize {
+        self.boot_base as usize
+    }
+
+    fn boot_size(&self) -> usize {
+        self.boot_size as usize
+    }
+
+    fn unlock(&mut self) {
+        tinyboot_ch32_hal::flash::unlock();
     }
 }
 

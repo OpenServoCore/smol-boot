@@ -8,19 +8,103 @@ use tinyboot_protocol::{Cmd, Status};
 
 // Re-exports so app examples only need this one crate.
 pub use tinyboot::traits::app as traits;
-pub use tinyboot_protocol::frame::{self, payload_size};
+pub use tinyboot_protocol::pkg_version;
 
-/// App info configuration — must match the bootloader's storage geometry.
-#[derive(Clone, Copy)]
-pub struct AppInfo {
-    pub capacity: u32,
-    pub payload_size: u16,
+/// Define the `.tinyboot_version` static using the calling crate's version.
+/// Place this at module scope in your application binary.
+#[macro_export]
+macro_rules! app_version {
+    () => {
+        #[unsafe(link_section = ".tinyboot_version")]
+        #[used]
+        static _APP_VERSION: u16 = $crate::pkg_version!();
+    };
+}
+
+/// Hardware configuration for the app-side tinyboot client.
+pub struct AppConfig {
+    pub boot_base: u32,
+    pub boot_size: u32,
+    pub app_size: u32,
     pub erase_size: u16,
-    pub version: u16,
+}
+
+/// App-side tinyboot client. Handles Info/Reset commands and boot confirmation.
+pub struct App {
+    frame: Frame,
+    info: AppInfo,
+}
+
+struct AppInfo {
+    capacity: u32,
+    erase_size: u16,
+    boot_version: u16,
+    app_version: u16,
+}
+
+impl App {
+    pub fn new(config: &AppConfig) -> Self {
+        let boot_ver_addr = (config.boot_base + config.boot_size - 2) as *const u16;
+        Self {
+            frame: Frame::default(),
+            info: AppInfo {
+                capacity: config.app_size,
+                erase_size: config.erase_size,
+                boot_version: unsafe { boot_ver_addr.read_volatile() },
+                app_version: pkg_version!(),
+            },
+        }
+    }
+
+    /// Confirm boot — transitions Validating → Idle, preserving checksum.
+    /// Call after all peripherals are initialized.
+    pub fn confirm(&mut self) {
+        BootClient.confirm();
+    }
+
+    /// Poll for tinyboot commands (blocking).
+    pub fn poll<R: embedded_io::Read, W: embedded_io::Write>(&mut self, rx: &mut R, tx: &mut W) {
+        let status = match self.frame.read(rx) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        if status == Status::Ok {
+            handle_cmd(&mut self.frame, &self.info);
+        } else {
+            self.frame.len = 0;
+            self.frame.status = status;
+        }
+        if self.frame.cmd != Cmd::Reset {
+            let _ = self.frame.send(tx);
+            let _ = tx.flush();
+        }
+    }
+
+    /// Poll for tinyboot commands (async).
+    pub async fn poll_async<R: embedded_io_async::Read, W: embedded_io_async::Write>(
+        &mut self,
+        rx: &mut R,
+        tx: &mut W,
+    ) {
+        let status = match self.frame.read_async(rx).await {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        if status == Status::Ok {
+            handle_cmd(&mut self.frame, &self.info);
+        } else {
+            self.frame.len = 0;
+            self.frame.status = status;
+        }
+        if self.frame.cmd != Cmd::Reset {
+            let _ = self.frame.send_async(tx).await;
+            let _ = tx.flush().await;
+        }
+    }
 }
 
 #[derive(Default)]
-pub struct BootClient;
+struct BootClient;
 
 impl TBBootClient for BootClient {
     fn confirm(&mut self) {
@@ -45,56 +129,17 @@ impl TBBootClient for BootClient {
     }
 }
 
-/// Poll for tinyboot commands (blocking).
-/// Info: responds with device geometry. Reset: addr=0 normal, addr=1 enter bootloader.
-pub fn poll_cmd<const D: usize, R: embedded_io::Read, W: embedded_io::Write>(
-    rx: &mut R,
-    tx: &mut W,
-    frame: &mut Frame<D>,
-    info: &AppInfo,
-) {
-    if frame.read(rx).is_err() {
-        return;
-    }
-    handle_cmd(frame, info);
-    if frame.cmd != Cmd::Reset {
-        let _ = frame.send(tx);
-        let _ = tx.flush();
-    }
-}
-
-/// Poll for tinyboot commands (async).
-/// Info: responds with device geometry. Reset: addr=0 normal, addr=1 enter bootloader.
-pub async fn poll_cmd_async<
-    const D: usize,
-    R: embedded_io_async::Read,
-    W: embedded_io_async::Write,
->(
-    rx: &mut R,
-    tx: &mut W,
-    frame: &mut Frame<D>,
-    info: &AppInfo,
-) {
-    if frame.read_async(rx).await.is_err() {
-        return;
-    }
-    handle_cmd(frame, info);
-    if frame.cmd != Cmd::Reset {
-        let _ = frame.send_async(tx).await;
-        let _ = tx.flush().await;
-    }
-}
-
-fn handle_cmd<const D: usize>(frame: &mut Frame<D>, info: &AppInfo) {
+fn handle_cmd(frame: &mut Frame, info: &AppInfo) {
     frame.status = Status::Ok;
     match frame.cmd {
         Cmd::Info => {
-            frame.len = 10;
+            frame.len = 12;
             frame.data.info = InfoData {
                 capacity: info.capacity,
-                payload_size: info.payload_size,
                 erase_size: info.erase_size,
-                version: info.version,
+                boot_version: info.boot_version,
+                app_version: info.app_version,
+                mode: 1, // app
             };
         }
         Cmd::Reset => {
@@ -108,6 +153,7 @@ fn handle_cmd<const D: usize>(frame: &mut Frame<D>, info: &AppInfo) {
         }
         _ => {
             frame.len = 0;
+            frame.status = Status::Unsupported;
         }
     }
 }

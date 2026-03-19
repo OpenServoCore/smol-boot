@@ -13,6 +13,9 @@ pub use platform::{
 // Re-exports so boot examples only need this one crate.
 pub use tinyboot::Core;
 pub use tinyboot::traits::boot::Platform;
-pub use tinyboot_ch32_hal::flash::unlock as flash_unlock;
 pub use tinyboot_ch32_hal::gpio::Pull;
 pub use tinyboot_ch32_hal::{Pin, UsartMapping};
+
+#[unsafe(link_section = ".tinyboot_version")]
+#[used]
+static BOOT_VERSION: u16 = tinyboot_protocol::pkg_version!();

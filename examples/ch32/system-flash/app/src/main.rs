@@ -1,80 +1,95 @@
 //! Example application for the system-flash bootloader.
 //!
-//! - Blink task: toggles LED on PD4 every second with defmt status
-//! - Main loop: listens on USART1 (TX=PD5, RX=PD6) for tinyboot Probe commands,
-//!   reboots into bootloader on receipt
+//! - Timer interrupt blinks LED on PD4 every second
+//! - Main loop listens on USART1 (TX=PD5, RX=PD6) for tinyboot commands,
+//!   reboots into bootloader on receipt of Reset command
+//!
+//! No async runtime — just a timer interrupt for blink and a blocking main loop.
 
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
-#![feature(impl_trait_in_assoc_type)]
 
 mod transport;
 
-use ch32_hal as hal;
+use core::cell::RefCell;
+
+use ch32_hal::gpio::{Level, Output};
+use ch32_hal::interrupt::InterruptExt;
+use ch32_hal::pac;
+use ch32_hal::time::Hertz;
+use ch32_hal::timer::low_level::Timer;
+use ch32_hal::usart::{self, Uart};
+use critical_section::Mutex;
 use defmt_rtt as _;
 use panic_halt as _;
+use tinyboot_ch32_app::{App, AppConfig};
 
-use embassy_executor::Spawner;
-use embassy_time::Timer;
-use hal::gpio::{AnyPin, Level, Output};
-use hal::usart::{self, Uart};
-use hal::Peri;
-use tinyboot_ch32_app::traits::BootClient;
-use tinyboot_ch32_app::{frame::Frame, payload_size};
+tinyboot_ch32_app::app_version!();
 
-hal::bind_interrupts!(struct Irqs {
-    USART1 => hal::usart::InterruptHandler<hal::peripherals::USART1>;
-});
+// --- Flash layout (must match bootloader) ---
+const BOOT_BASE: u32 = 0x1FFF_F000;
+const BOOT_SIZE: u32 = 1920;
+const APP_SIZE: u32 = 16 * 1024;
+const ERASE_SIZE: u16 = 64;
 
-const FRAME_SIZE: usize = 64;
+type Shared<T> = Mutex<RefCell<Option<T>>>;
+static LED: Shared<Output<'static>> = Mutex::new(RefCell::new(None));
 
-#[embassy_executor::task]
-async fn blink(pin: Peri<'static, AnyPin>) {
-    let mut led = Output::new(pin, Level::Low, Default::default());
-    loop {
-        led.set_high();
-        defmt::info!("LED on");
-        Timer::after_millis(1000).await;
-        led.set_low();
-        defmt::info!("LED off");
-        Timer::after_millis(1000).await;
-    }
+#[qingke_rt::interrupt]
+fn TIM2() {
+    pac::TIM2.intfr().modify(|w| w.set_uif(false));
+    critical_section::with(|cs| {
+        if let Some(ref mut led) = *LED.borrow_ref_mut(cs) {
+            led.toggle();
+            if led.is_set_high() {
+                defmt::info!("LED on");
+            } else {
+                defmt::info!("LED off");
+            }
+        }
+    });
 }
 
-#[embassy_executor::main(entry = "qingke_rt::entry")]
-async fn main(spawner: Spawner) -> ! {
-    let mut config = hal::Config::default();
-    config.rcc = hal::rcc::Config::SYSCLK_FREQ_48MHZ_HSI;
-    let p = hal::init(config);
+#[qingke_rt::entry]
+fn main() -> ! {
+    let p = ch32_hal::init(Default::default());
 
-    defmt::info!("Confirming boot...");
-    tinyboot_ch32_app::BootClient::default().confirm();
-    defmt::info!("Boot confirmed.");
+    // LED blink via TIM2 interrupt (2 Hz toggle = 1 Hz blink)
+    critical_section::with(|cs| {
+        LED.borrow_ref_mut(cs)
+            .replace(Output::new(p.PD4, Level::Low, Default::default()));
+    });
+    let tim = Timer::new(p.TIM2);
+    tim.set_frequency(Hertz::hz(2));
+    tim.enable_update_interrupt(true);
+    tim.start();
+    unsafe { ch32_hal::interrupt::TIM2.enable() };
 
-    spawner.spawn(blink(p.PD4.into())).unwrap();
-
-    // USART1 async (Remap 0: RX=PD6, TX=PD5)
+    // USART1 blocking — must match the bootloader's pin mapping.
+    //
+    // Remap options (CH32V003, ch32-hal generic param):
+    //   0 (Remap0): TX=PD5, RX=PD6 (default)
+    //   1 (Remap1): TX=PD0, RX=PD1
+    //   2 (Remap2): TX=PD6, RX=PD5
+    //   3 (Remap3): TX=PC0, RX=PC1
     let mut uart_config = usart::Config::default();
     uart_config.baudrate = 115200;
-    let uart = Uart::new::<0>(
-        p.USART1, p.PD6, p.PD5, Irqs, p.DMA1_CH4, p.DMA1_CH5, uart_config,
-    )
-    .unwrap();
-    let (mut tx, mut rx) = uart.split();
-    let mut rx = transport::AsyncRx(rx);
-    let mut tx = transport::AsyncTx(tx);
-    let mut frame = Frame::<{ payload_size(FRAME_SIZE) }>::default();
-    let info = tinyboot_ch32_app::AppInfo {
-        capacity: 16 * 1024,
-        payload_size: payload_size(FRAME_SIZE) as u16,
-        erase_size: 1024,
-        version: 1,
-    };
+    let uart = Uart::new_blocking::<0>(p.USART1, p.PD6, p.PD5, uart_config).unwrap();
+    let (tx, rx) = uart.split();
+    let mut rx = transport::Rx(rx);
+    let mut tx = transport::Tx(tx);
 
-    defmt::info!("App started. Listening on USART1...");
+    // Tinyboot app client
+    let mut app = App::new(&AppConfig {
+        boot_base: BOOT_BASE,
+        boot_size: BOOT_SIZE,
+        app_size: APP_SIZE,
+        erase_size: ERASE_SIZE,
+    });
+    app.confirm();
+    defmt::info!("Boot confirmed, app ready.");
 
     loop {
-        tinyboot_ch32_app::poll_cmd_async(&mut rx, &mut tx, &mut frame, &info).await;
+        app.poll(&mut rx, &mut tx);
     }
 }

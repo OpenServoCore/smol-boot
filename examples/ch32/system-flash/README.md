@@ -14,7 +14,9 @@ entire 16KB user flash available for applications.
 ```
  System Flash (0x1FFFF000)
  ┌──────────────────────────────┐ 0x1FFFF000
- │  Bootloader code (1920 B)   │
+ │  Bootloader code (≤1918 B)  │
+ ├──────────────────────────────┤ 0x1FFFF77E
+ │  Boot version (2 B)         │
  └──────────────────────────────┘ 0x1FFFF780
 
  Option Bytes (0x1FFFF800)
@@ -27,8 +29,10 @@ entire 16KB user flash available for applications.
  User Flash (0x08000000)
  ┌──────────────────────────────┐ 0x08000000
  │                              │
- │  Application (16KB)          │
+ │  Application (16KB - 2)      │
  │                              │
+ ├──────────────────────────────┤ 0x08003FFE
+ │  App version (2 B)           │
  └──────────────────────────────┘ 0x08004000
 
  RAM (0x20000000)

@@ -39,13 +39,17 @@ Total frame size = 12 bytes overhead + payload. For example, a UART transport wi
 
 ### Info response
 
-Returns 8 bytes via the `InfoData` union variant:
+Returns 12 bytes via the `InfoData` union variant:
 
 | Offset | Size    | Description                                |
 | ------ | ------- | ------------------------------------------ |
 | 0      | 4 bytes | App region capacity in bytes (u32 LE)      |
 | 4      | 2 bytes | Max payload size per write frame (u16 LE)  |
 | 6      | 2 bytes | Erase page size in bytes (u16 LE)          |
+| 8      | 2 bytes | Boot version (packed u16 LE, 0xFFFF=none)  |
+| 10     | 2 bytes | App version (packed u16 LE, 0xFFFF=none)   |
+
+Versions are packed as `(major << 11) | (minor << 6) | patch` and read from the last 2 bytes of each flash region.
 
 ### Erase
 

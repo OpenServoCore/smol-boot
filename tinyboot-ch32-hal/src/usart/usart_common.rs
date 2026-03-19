@@ -7,7 +7,7 @@ pub fn init(r: ch32_metapac::usart::Usart, pclk: u32, baud: u32, half_duplex: bo
 
     // RTSE=0, CTSE=0 are default; only touch CTLR3 for half-duplex
     if half_duplex {
-        r.ctlr3().modify(|w| w.set_hdsel(true));
+        r.ctlr3().write(|w| w.set_hdsel(true));
     }
 
     let brr = (pclk + baud / 2) / baud;

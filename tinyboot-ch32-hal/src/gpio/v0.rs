@@ -58,13 +58,11 @@ pub fn configure(pin: Pin, mode: PinMode) {
 pub fn set_high(pin: Pin) {
     pin.gpio_regs()
         .bshr()
-        .write(|w| w.set_bs(pin.pin_number(), true));
+        .write(|w| w.0 = 1 << pin.pin_number());
 }
 
 pub fn set_low(pin: Pin) {
-    pin.gpio_regs()
-        .bcr()
-        .write(|w| w.set_br(pin.pin_number(), true));
+    pin.gpio_regs().bcr().write(|w| w.0 = 1 << pin.pin_number());
 }
 
 impl embedded_hal::digital::ErrorType for Pin {

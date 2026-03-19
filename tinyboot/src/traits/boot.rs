@@ -1,10 +1,7 @@
 use super::BootState;
 
 /// Trait for firmware transfer protocol.
-///
-/// The const generic `D` is the maximum payload size per frame,
-/// determined by the transport (e.g. UART frame size minus protocol overhead).
-pub trait Transport<const D: usize>: embedded_io::Read + embedded_io::Write {}
+pub trait Transport: embedded_io::Read + embedded_io::Write {}
 
 /// Trait for reading and writing firmware to persistent storage.
 ///
@@ -15,6 +12,15 @@ pub trait Storage:
 {
     /// Direct read access to the app region (zero-copy).
     fn as_slice(&self) -> &[u8];
+
+    /// Physical base address of the boot flash region.
+    fn boot_base(&self) -> usize;
+
+    /// Size of the boot flash region in bytes.
+    fn boot_size(&self) -> usize;
+
+    /// Unlock flash for erase/write. Called once before entering the protocol loop.
+    fn unlock(&mut self);
 }
 
 /// Trait for system boot control.
@@ -51,9 +57,9 @@ pub trait BootMetaStore {
     fn refresh(&mut self, checksum: u16, state: BootState) -> Result<(), Self::Error>;
 }
 
-pub struct Platform<const D: usize, T, S, B, C>
+pub struct Platform<T, S, B, C>
 where
-    T: Transport<D>,
+    T: Transport,
     S: Storage,
     B: BootMetaStore,
     C: BootCtl,
@@ -64,9 +70,9 @@ where
     pub ctl: C,
 }
 
-impl<const D: usize, T, S, B, C> Platform<D, T, S, B, C>
+impl<T, S, B, C> Platform<T, S, B, C>
 where
-    T: Transport<D>,
+    T: Transport,
     S: Storage,
     B: BootMetaStore,
     C: BootCtl,
