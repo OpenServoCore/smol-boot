@@ -39,7 +39,7 @@ let storage = Storage::new(StorageConfig {
     app_size: 16 * 1024,
 });
 
-let platform = Platform::new(transport, storage, BootMetaStore, BootCtl::new(BootCtlConfig {}));
+let platform = Platform::new(transport, storage, BootMetaStore::default(), BootCtl::new(BootCtlConfig {}));
 Core::new(platform).run();
 ```
 
@@ -47,9 +47,9 @@ See [`examples/ch32/system-flash`](../examples/ch32/system-flash/) for a complet
 
 ## Features
 
-| Feature        | Description                                     |
-| -------------- | ----------------------------------------------- |
-| `ch32v003f4p6` | CH32V003F4P6 chip variant (default)             |
-| `rt`           | Runtime startup code (reset vector, stack init) |
-| `system-flash` | Bootloader runs from system flash               |
-| `defmt`        | Enable defmt logging                            |
+| Feature        | Description                                                          |
+| -------------- | -------------------------------------------------------------------- |
+| `ch32v003f4p6` | CH32V003F4P6 chip variant (default)                                  |
+| `rt`           | Minimal runtime startup (GP/SP init, no vector table or static init) |
+| `system-flash` | Bootloader runs from system flash                                    |
+| `defmt`        | Enable defmt logging                                                 |

@@ -30,7 +30,7 @@ Idle (0xFF) → Updating (0x7F) → Validating (0x3F) → Idle (0xFF)
 | **Confirm**  | Validating    | Idle         | app is alive                    | refresh (state=Idle, preserve checksum)    | Normal app startup, confirms boot              |
 | **Boot app** | Idle          | (boot)       | validate_app passes             | none                                       | Normal power-on, app is valid                  |
 | **Boot app** | Updating      | (bootloader) |                                 | none                                       | Update was interrupted, resume                 |
-| **Boot app** | Validating    | (boot)       | validate_app passes, trials > 0 | step down trials byte                      | Trial boot after verify, testing new firmware  |
+| **Boot app** | Validating    | (boot)       | validate_app passes, has trials | step down trials byte                      | Trial boot after verify, testing new firmware  |
 
 ### Persistence
 
@@ -40,9 +40,9 @@ Idle (0xFF) → Updating (0x7F) → Validating (0x3F) → Idle (0xFF)
 
 ### Metadata (stored in option bytes)
 
-| Field       | OB Offset | Description                                  |
-| ----------- | --------- | -------------------------------------------- |
-| State       | +0        | Boot lifecycle state (0xFF/0x7F/0x3F)        |
-| Trials      | +2        | Trial boot counter, each boot clears one bit |
-| Checksum    | +4,+6     | CRC16 of application firmware                |
-| App Size    | +8..+14   | Firmware size in bytes (u32)                 |
+| Field    | OB Offset | Description                                  |
+| -------- | --------- | -------------------------------------------- |
+| State    | +0        | Boot lifecycle state (0xFF/0x7F/0x3F)        |
+| Trials   | +2        | Trial boot counter, each boot clears one bit |
+| Checksum | +4,+6     | CRC16 of application firmware                |
+| App Size | +8..+14   | Firmware size in bytes (u32)                 |

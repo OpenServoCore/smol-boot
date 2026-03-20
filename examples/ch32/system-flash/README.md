@@ -35,7 +35,7 @@ entire 16KB user flash available for applications.
 
  RAM (0x20000000)
  ┌──────────────────────────────┐ 0x20000000
- │  Data / BSS / Stack (2KB)   │
+ │  Stack (2KB)                │
  └──────────────────────────────┘ 0x20000800
 ```
 
