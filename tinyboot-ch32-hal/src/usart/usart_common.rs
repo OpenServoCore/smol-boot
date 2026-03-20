@@ -1,4 +1,6 @@
-pub fn init(r: ch32_metapac::usart::Usart, pclk: u32, baud: u32, half_duplex: bool) {
+pub use ch32_metapac::usart::Usart as Regs;
+
+pub fn init(r: Regs, pclk: u32, baud: u32, half_duplex: bool) {
     // 8N1: write zeroes all bits (M=0, PCE=0, STOP=0b00), then set TE+RE
     r.ctlr1().write(|w| {
         w.set_te(true);

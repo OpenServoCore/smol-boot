@@ -1,7 +1,7 @@
 /// Jump to an absolute address. Does not return.
-#[allow(asm_sub_register)]
 pub fn jump(addr: u32) -> ! {
-    unsafe { core::arch::asm!("jr {0}", in(reg) addr, options(noreturn)) };
+    let f: unsafe extern "C" fn() -> ! = unsafe { core::mem::transmute(addr as usize) };
+    unsafe { f() }
 }
 
 pub fn system_reset() -> ! {

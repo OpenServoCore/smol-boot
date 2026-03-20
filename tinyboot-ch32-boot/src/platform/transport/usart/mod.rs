@@ -62,7 +62,7 @@ pub struct UsartConfig {
 
 /// USART transport with optional RS-485 TX-enable control.
 pub struct Usart {
-    regs: ch32_metapac::usart::Usart,
+    regs: tinyboot_ch32_hal::usart::Regs,
     tx_en: Option<TxEnConfig>,
 }
 

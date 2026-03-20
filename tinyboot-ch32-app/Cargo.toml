@@ -19,7 +19,6 @@ critical-section = "1.2"
 defmt = { workspace = true, optional = true }
 
 [features]
-default = ["ch32v003f4p6"]
 ch32v003f4p6 = ["tinyboot-ch32-hal/ch32v003f4p6"]
 system-flash = ["tinyboot-ch32-hal/system-flash"]
 defmt = ["dep:defmt"]

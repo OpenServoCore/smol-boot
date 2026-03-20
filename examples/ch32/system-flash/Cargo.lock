@@ -714,7 +714,6 @@ dependencies = [
 name = "tinyboot-ch32-boot"
 version = "0.1.0"
 dependencies = [
- "ch32-metapac 0.0.6",
  "critical-section",
  "embedded-io 0.7.1",
  "embedded-storage",

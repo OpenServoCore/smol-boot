@@ -3,6 +3,6 @@ set -e
 
 cargo fmt --all
 git add -u
-cargo clippy --workspace --all-targets -- -D warnings
-cargo build --workspace
-cargo test --workspace
+cargo clippy --workspace --all-targets --features ch32v003f4p6 -- -D warnings
+cargo build --workspace --features ch32v003f4p6
+cargo test --workspace --features ch32v003f4p6
