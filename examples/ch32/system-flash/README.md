@@ -23,16 +23,14 @@ entire 16KB user flash available for applications.
  ┌──────────────────────────────┐ 0x1FFFF800
  │  Chip config (16 B)         │
  ├──────────────────────────────┤ 0x1FFFF810
- │  Boot metadata (8 B)        │  state, trials, checksum (4 halfwords)
- └──────────────────────────────┘ 0x1FFFF818
+ │  Boot metadata (16 B)       │  state, trials, checksum, app_size (u32)
+ └──────────────────────────────┘ 0x1FFFF820
 
  User Flash (0x08000000)
  ┌──────────────────────────────┐ 0x08000000
  │                              │
- │  Application (16KB - 2)      │
+ │  Application (16KB)          │
  │                              │
- ├──────────────────────────────┤ 0x08003FFE
- │  App version (2 B)           │
  └──────────────────────────────┘ 0x08004000
 
  RAM (0x20000000)
@@ -52,10 +50,10 @@ are preserved across OB erase+rewrite cycles.
 
 > **Warning:** The OB region is 64 bytes, but only the first 16 bytes are
 > documented for chip config. The remaining bytes (`0x1FFFF810+`) default to
-> `0xFF` and are writable — so we took the liberty to commandeer 8 of them
+> `0xFF` and are writable — so we took the liberty to commandeer 16 of them
 > for boot metadata. If your application also manipulates option bytes
 > (e.g. via the OB erase command), preserve the halfwords at
-> `0x1FFFF810–0x1FFFF817` or the bootloader will lose its state.
+> `0x1FFFF810–0x1FFFF81F` or the bootloader will lose its state.
 
 ## Boot State Machine
 

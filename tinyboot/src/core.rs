@@ -47,7 +47,7 @@ where
             BootState::Idle => {}
             BootState::Updating => return Ok(true),
             BootState::Validating => {
-                if self.platform.boot_meta.trials_remaining() == 0 {
+                if !self.platform.boot_meta.has_trials() {
                     return Ok(true);
                 }
                 self.platform.boot_meta.consume_trial()?;
@@ -61,14 +61,18 @@ where
         Ok(false)
     }
 
-    /// Validate the app image. The CRC covers the entire app region
-    /// (firmware + erased tail), not just the firmware bytes. The host
-    /// must compute the CRC the same way (pad with 0xFF to capacity).
+    /// Validate the app image. The CRC covers only `app_size` bytes
+    /// (the actual firmware), not the entire flash region.
     fn validate_app(&self) -> bool {
         let stored = self.platform.boot_meta.app_checksum();
         if stored != 0xFFFF {
             use tinyboot_protocol::crc::{CRC_INIT, crc16};
-            return crc16(CRC_INIT, self.platform.storage.as_slice()) == stored;
+            let sz = self.platform.boot_meta.app_size() as usize;
+            // SAFETY: checksum != 0xFFFF means meta was previously written
+            // by a Verify that validated app_size against capacity.
+            return crc16(CRC_INIT, unsafe {
+                self.platform.storage.as_slice().get_unchecked(..sz)
+            }) == stored;
         }
         // No CRC stored (virgin/debugger-flashed) — check if app exists
         let data = self.platform.storage.as_slice();

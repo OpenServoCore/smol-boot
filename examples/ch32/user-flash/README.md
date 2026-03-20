@@ -23,18 +23,16 @@ This configuration has more room for features — defmt logging is enabled.
  │  Boot metadata (64 B)       │
  ├──────────────────────────────┤ 0x08001000
  │                              │
- │  Application (12KB - 2)      │
+ │  Application (12KB)           │
  │                              │
- ├──────────────────────────────┤ 0x08003FFE
- │  App version (2 B)           │
  └──────────────────────────────┘ 0x08004000
 
  Option Bytes (0x1FFFF800)
  ┌──────────────────────────────┐ 0x1FFFF800
  │  Chip config (16 B)         │
  ├──────────────────────────────┤ 0x1FFFF810
- │  Boot metadata (8 B)        │  state, trials, checksum (4 halfwords)
- └──────────────────────────────┘ 0x1FFFF818
+ │  Boot metadata (16 B)       │  state, trials, checksum, app_size (u32)
+ └──────────────────────────────┘ 0x1FFFF820
 
  RAM (0x20000000)
  ┌──────────────────────────────┐ 0x20000000
@@ -50,7 +48,7 @@ Boot metadata (state, trials, checksum) is stored in **option bytes** at
 `0x1FFFF810`, shared with the system-flash example. This avoids consuming
 user flash for metadata.
 
-> **Warning:** The OB bytes at `0x1FFFF810–0x1FFFF817` are spare space in
+> **Warning:** The OB bytes at `0x1FFFF810–0x1FFFF81F` are spare space in
 > the 64-byte OB region — we took the liberty to commandeer them for boot
 > metadata. If your application manipulates option bytes directly, preserve
 > these halfwords or the bootloader will lose its state.

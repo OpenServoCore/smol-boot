@@ -40,8 +40,9 @@ Idle (0xFF) → Updating (0x7F) → Validating (0x3F) → Idle (0xFF)
 
 ### Metadata (stored in option bytes)
 
-| Field    | OB Offset | Description                                  |
-| -------- | --------- | -------------------------------------------- |
-| State    | +0        | Boot lifecycle state (0xFF/0x7F/0x3F)        |
-| Trials   | +2        | Trial boot counter, each boot clears one bit |
-| Checksum | +4,+6     | CRC16 of application firmware                |
+| Field       | OB Offset | Description                                  |
+| ----------- | --------- | -------------------------------------------- |
+| State       | +0        | Boot lifecycle state (0xFF/0x7F/0x3F)        |
+| Trials      | +2        | Trial boot counter, each boot clears one bit |
+| Checksum    | +4,+6     | CRC16 of application firmware                |
+| App Size    | +8..+14   | Firmware size in bytes (u32)                 |

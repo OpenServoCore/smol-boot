@@ -44,8 +44,17 @@ pub trait BootMetaStore {
     /// Number of trial boots remaining (count of 1-bits in trials field).
     fn trials_remaining(&self) -> u8;
 
+    /// Returns true if any trial boots remain.
+    /// Override for targets without hardware popcount.
+    fn has_trials(&self) -> bool {
+        self.trials_remaining() > 0
+    }
+
     /// Stored CRC16 of the application firmware.
     fn app_checksum(&self) -> u16;
+
+    /// Stored application size in bytes.
+    fn app_size(&self) -> u32;
 
     /// Step state down by one (1→0 bit clear).
     fn advance(&mut self) -> Result<BootState, Self::Error>;
@@ -53,9 +62,14 @@ pub trait BootMetaStore {
     /// Consume one trial boot (clears one bit in the trials field).
     fn consume_trial(&mut self) -> Result<(), Self::Error>;
 
-    /// Erase meta and rewrite with given checksum and state.
+    /// Erase meta and rewrite with given checksum, state, and app_size.
     /// Trials return to erased default (full).
-    fn refresh(&mut self, checksum: u16, state: BootState) -> Result<(), Self::Error>;
+    fn refresh(
+        &mut self,
+        checksum: u16,
+        state: BootState,
+        app_size: u32,
+    ) -> Result<(), Self::Error>;
 }
 
 /// Concrete platform holding all boot-time peripherals.
