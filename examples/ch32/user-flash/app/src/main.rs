@@ -20,8 +20,6 @@ use ch32_hal::usart::{self, Uart};
 use critical_section::Mutex;
 use defmt_rtt as _;
 use panic_halt as _;
-use tinyboot_ch32_app::{App, AppConfig};
-
 tinyboot_ch32_app::app_version!();
 
 // --- Flash layout (must match bootloader) ---
@@ -78,12 +76,7 @@ fn main() -> ! {
     let mut tx = transport::Tx(tx);
 
     // Tinyboot app client
-    let mut app = App::new(&AppConfig {
-        boot_base: BOOT_BASE,
-        boot_size: BOOT_SIZE,
-        app_size: APP_SIZE,
-        erase_size: ERASE_SIZE,
-    });
+    let mut app = tinyboot_ch32_app::new_app(BOOT_BASE, BOOT_SIZE, APP_SIZE, ERASE_SIZE);
     app.confirm();
     defmt::info!("Boot confirmed, app ready.");
 

@@ -47,19 +47,16 @@ tinyboot is structured as a library, not a monolithic binary. The core logic and
 
 ## Crates
 
-| Crate | Description |
-| ----- | ----------- |
-| [`tinyboot`](tinyboot/) | Platform-agnostic bootloader core (protocol dispatcher, boot state machine, app validation) |
-| [`tinyboot-protocol`](tinyboot-protocol/) | Wire protocol (frame format, CRC16, commands) |
-| [`tinyboot-ch32-hal`](tinyboot-ch32-hal/) | Minimal CH32 HAL (flash, GPIO, USART, RCC) |
-| [`tinyboot-ch32-boot`](tinyboot-ch32-boot/) | CH32 bootloader platform (storage, boot control, OB metadata) |
-| [`tinyboot-ch32-app`](tinyboot-ch32-app/) | CH32 app-side boot client (confirm, request update) |
-| [`tinyboot-cli`](tinyboot-cli/) | Host-side CLI for flashing firmware over UART |
-
-## Examples
-
-- [`examples/ch32/system-flash`](examples/ch32/system-flash/) — 1920-byte bootloader in system flash (production)
-- [`examples/ch32/user-flash`](examples/ch32/user-flash/) — 4KB bootloader in user flash (development, with defmt)
+| Crate / Example                                             | Category | Description                                                                                 |
+| ----------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| [`tinyboot`](tinyboot/)                                     | core     | Platform-agnostic bootloader core (protocol dispatcher, boot state machine, app validation) |
+| [`tinyboot-protocol`](tinyboot-protocol/)                   | core     | Wire protocol (frame format, CRC16, commands)                                               |
+| [`tinyboot-ch32-hal`](tinyboot-ch32-hal/)                   | ch32     | Minimal HAL (flash, GPIO, USART, RCC)                                                       |
+| [`tinyboot-ch32-boot`](tinyboot-ch32-boot/)                 | ch32     | Bootloader platform (storage, boot control, OB metadata)                                    |
+| [`tinyboot-ch32-app`](tinyboot-ch32-app/)                   | ch32     | App-side boot client (confirm, request update)                                              |
+| [`tinyboot-cli`](tinyboot-cli/)                             | host     | CLI firmware flasher over UART                                                              |
+| [`examples/ch32/system-flash`](examples/ch32/system-flash/) | example  | Full-featured bootloader in 1920 bytes of system flash, all 16KB free for app               |
+| [`examples/ch32/user-flash`](examples/ch32/user-flash/)     | example  | Same bootloader in user flash, with room for extras like defmt logging                      |
 
 ## Rust Version
 
@@ -70,7 +67,7 @@ The workspace uses **edition 2024**.
 
 ## Getting Started
 
-1. **Build your bootloader** — create a small crate with a `main.rs` that configures your pins, baud rate, and flash layout. See the [system-flash example](examples/ch32/system-flash/) for a complete working setup, or the [user-flash example](examples/ch32/user-flash/) for a development configuration with defmt logging.
+1. **Build your bootloader** — create a small crate with a `main.rs` that configures your pins, baud rate, and flash layout. The [system-flash example](examples/ch32/system-flash/) puts the bootloader in system flash, leaving all user flash for your app. The [user-flash example](examples/ch32/user-flash/) keeps it in user flash instead, which gives more room for bootloader features (e.g. defmt logging) or debugging the bootloader itself.
 
 2. **Flash the bootloader** to system flash using [wlink](https://github.com/ch32-rs/wlink):
 
@@ -105,12 +102,12 @@ For CH32, we use [ch32-metapac](https://github.com/ch32-rs/ch32-data) for regist
 
 Implement the four platform traits from `tinyboot::traits::boot`:
 
-| Trait | What to implement |
-| ----- | ----------------- |
-| `Transport` | Any `embedded_io::Read + Write` stream — UART, RS-485, USB, SPI, even WiFi or Bluetooth. The protocol doesn't care what carries the bytes |
-| `Storage` | Implement `embedded_storage::NorFlash` (erase, write) and provide `as_slice()` for zero-copy flash reads, plus `unlock()` |
-| `BootMetaStore` | Read/write boot state, trial counter, and app checksum from your chip's equivalent of option bytes or a reserved flash page |
-| `BootCtl` | `is_boot_requested()` checks your boot flag (OB bit, RAM magic, GPIO pin, etc.); `system_reset()` resets or jumps to app |
+| Trait           | What to implement                                                                                                                         |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Transport`     | Any `embedded_io::Read + Write` stream — UART, RS-485, USB, SPI, even WiFi or Bluetooth. The protocol doesn't care what carries the bytes |
+| `Storage`       | Implement `embedded_storage::NorFlash` (erase, write) and provide `as_slice()` for zero-copy flash reads, plus `unlock()`                 |
+| `BootMetaStore` | Read/write boot state, trial counter, and app checksum from your chip's equivalent of option bytes or a reserved flash page               |
+| `BootCtl`       | `is_boot_requested()` checks your boot flag (OB bit, RAM magic, GPIO pin, etc.); `system_reset()` resets or jumps to app                  |
 
 Wire them together in a `Platform` struct and pass it to `Core::new(platform).run()`.
 

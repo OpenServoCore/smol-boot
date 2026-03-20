@@ -12,6 +12,7 @@ readme = "README.md"
 [dependencies]
 defmt = { workspace = true, optional = true }
 embedded-io = { workspace = true }
+embedded-io-async = { workspace = true }
 embedded-storage = { workspace = true }
 tinyboot-protocol = { version = "0.1.0", path = "../tinyboot-protocol" }
 

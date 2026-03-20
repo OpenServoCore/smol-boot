@@ -9,6 +9,8 @@
 #[macro_use]
 mod log;
 
+/// App-side tinyboot client (poll, confirm, command handling).
+pub mod app;
 /// Boot state machine and entry point.
 pub mod core;
 /// Protocol frame dispatcher.
