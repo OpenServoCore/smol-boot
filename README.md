@@ -135,6 +135,20 @@ tinyboot currently supports the **CH32V003** over **UART / RS-485**. This is tes
 
 **Want a different transport or chip?** [File an issue.](https://github.com/OpenServoCore/tinyboot/issues) USB support in particular would be a natural addition. Transports like Bluetooth are harder to fit in system flash, though newer CH32 chips with larger system flash regions may make it feasible — no guarantees.
 
+## Safety
+
+The crates use `unsafe` in targeted places, primarily to meet the extreme size constraints of system flash (1920 bytes):
+
+- **`repr(C)` unions and `MaybeUninit`** — zero-copy frame access and avoiding zero-initialization overhead
+- **`read_volatile` / `write_volatile`** — direct flash reads/writes, version reads, and boot request flag access
+- **`transmute`** — enum conversions (boot state) and function pointer cast for jump-to-address
+- **`from_raw_parts`** — zero-copy flash slice access in the storage layer
+- **Linker section attributes** — placing version data and boot metadata at fixed flash addresses
+- **`export_name` / `extern "C"`** — runtime entry points and linker symbol access
+- **Critical section impl** — no-op implementation since the bootloader runs with interrupts disabled
+
+These are deliberate trade-offs — safe alternatives would pull in extra code that doesn't fit. The unsafe is confined to data layout, memory access, and hardware boundaries; the bootloader state machine and protocol logic are safe Rust.
+
 ## Contributing
 
 Contributions are welcome — especially new chip ports and transport implementations. If you're thinking about adding support for a new MCU family, the [Porting to a New Chip](#porting-to-a-new-chip) section above covers the trait surface you'd need to implement.
