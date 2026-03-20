@@ -19,37 +19,37 @@ A single `Frame` struct is used for both requests (host to device) and responses
 
 Total frame size = 12 bytes overhead + payload. Maximum payload is 64 bytes (`MAX_PAYLOAD`).
 
-| Field  | Size     | Description                                                   |
-| ------ | -------- | ------------------------------------------------------------- |
-| SYNC   | 2 bytes  | Preamble `0xAA 0x55` for frame synchronization                |
-| CMD    | 1 byte   | Command code                                                  |
-| STATUS | 1 byte   | `Request (0x00)` for requests, result status for responses    |
-| ADDR   | 4 bytes  | Flash address (u32 LE). Echoed in responses                   |
-| LEN    | 2 bytes  | Data payload length (u16 LE, 0..64)                           |
-| DATA   | 0..64    | Payload bytes                                                 |
-| CRC    | 2 bytes  | CRC16-CCITT (LE) over SYNC + CMD + STATUS + ADDR + LEN + DATA |
+| Field  | Size    | Description                                                   |
+| ------ | ------- | ------------------------------------------------------------- |
+| SYNC   | 2 bytes | Preamble `0xAA 0x55` for frame synchronization                |
+| CMD    | 1 byte  | Command code                                                  |
+| STATUS | 1 byte  | `Request (0x00)` for requests, result status for responses    |
+| ADDR   | 4 bytes | Flash address (u32 LE). Echoed in responses                   |
+| LEN    | 2 bytes | Data payload length (u16 LE, 0..64)                           |
+| DATA   | 0..64   | Payload bytes                                                 |
+| CRC    | 2 bytes | CRC16-CCITT (LE) over SYNC + CMD + STATUS + ADDR + LEN + DATA |
 
 ## Commands
 
-| Code | Name   | Direction      | Description                                               |
-| ---- | ------ | -------------- | --------------------------------------------------------- |
-| 0x00 | Info   | Host to Device | Query device info (capacity, erase size, versions, mode)  |
+| Code | Name   | Direction      | Description                                                                |
+| ---- | ------ | -------------- | -------------------------------------------------------------------------- |
+| 0x00 | Info   | Host to Device | Query device info (capacity, erase size, versions, mode)                   |
 | 0x01 | Erase  | Host to Device | Erase `byte_count` bytes at addr (first erase transitions Idle → Updating) |
-| 0x02 | Write  | Host to Device | Write data at address                                     |
-| 0x03 | Verify | Host to Device | Compute CRC16, store checksum + Validating state in OB    |
-| 0x04 | Reset  | Host to Device | Reset the device                                          |
+| 0x02 | Write  | Host to Device | Write data at address                                                      |
+| 0x03 | Verify | Host to Device | Compute CRC16, store checksum + Validating state in OB                     |
+| 0x04 | Reset  | Host to Device | Reset the device                                                           |
 
 ### Info response
 
 Returns 12 bytes via the `InfoData` struct:
 
-| Offset | Size    | Field          | Description                                |
-| ------ | ------- | -------------- | ------------------------------------------ |
-| 0      | 4 bytes | capacity       | App region capacity in bytes (u32 LE)      |
-| 4      | 2 bytes | erase_size     | Erase page size in bytes (u16 LE)          |
-| 6      | 2 bytes | boot_version   | Boot version (packed u16 LE, 0xFFFF=none)  |
-| 8      | 2 bytes | app_version    | App version (packed u16 LE, 0xFFFF=none)   |
-| 10     | 2 bytes | mode           | 0 = bootloader, 1 = app                    |
+| Offset | Size    | Field        | Description                               |
+| ------ | ------- | ------------ | ----------------------------------------- |
+| 0      | 4 bytes | capacity     | App region capacity in bytes (u32 LE)     |
+| 4      | 2 bytes | erase_size   | Erase page size in bytes (u16 LE)         |
+| 6      | 2 bytes | boot_version | Boot version (packed u16 LE, 0xFFFF=none) |
+| 8      | 2 bytes | app_version  | App version (packed u16 LE, 0xFFFF=none)  |
+| 10     | 2 bytes | mode         | 0 = bootloader, 1 = app                   |
 
 Versions are packed as `(major << 11) | (minor << 6) | patch` and read from the last 2 bytes of each flash region.
 
@@ -59,17 +59,17 @@ Erases `byte_count` bytes starting at `addr`. Both `addr` and `byte_count` must 
 
 Request payload (2 bytes via `EraseData`):
 
-| Offset | Size    | Field      | Description                          |
-| ------ | ------- | ---------- | ------------------------------------ |
-| 0      | 2 bytes | byte_count | Number of bytes to erase (u16 LE)    |
+| Offset | Size    | Field      | Description                       |
+| ------ | ------- | ---------- | --------------------------------- |
+| 0      | 2 bytes | byte_count | Number of bytes to erase (u16 LE) |
 
 ### Verify response
 
 Returns 2 bytes via the `VerifyData` struct:
 
-| Offset | Size    | Description                     |
-| ------ | ------- | ------------------------------- |
-| 0      | 2 bytes | CRC16 of app region (u16 LE)    |
+| Offset | Size    | Description                  |
+| ------ | ------- | ---------------------------- |
+| 0      | 2 bytes | CRC16 of app region (u16 LE) |
 
 ## Status codes
 

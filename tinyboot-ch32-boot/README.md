@@ -8,12 +8,12 @@ CH32 platform implementation for the tinyboot bootloader. Provides storage, tran
 
 Implements the `tinyboot::traits::boot::Platform` trait by composing four components:
 
-| Component | Description |
-| --------- | ----------- |
-| `Usart` | UART/RS-485 transport with configurable pin mapping, baud rate, and half/full duplex |
-| `Storage` | Flash read/write/erase via `embedded-storage` traits |
-| `BootMetaStore` | Option-byte-based boot state and checksum storage |
-| `BootCtl` | Boot control (app jump, system reset, boot request detection) |
+| Component       | Description                                                                          |
+| --------------- | ------------------------------------------------------------------------------------ |
+| `Usart`         | UART/RS-485 transport with configurable pin mapping, baud rate, and half/full duplex |
+| `Storage`       | Flash read/write/erase via `embedded-storage` traits                                 |
+| `BootMetaStore` | Option-byte-based boot state and checksum storage                                    |
+| `BootCtl`       | Boot control (app jump, system reset, boot request detection)                        |
 
 ## Usage
 
@@ -47,9 +47,9 @@ See [`examples/ch32/system-flash`](../examples/ch32/system-flash/) for a complet
 
 ## Features
 
-| Feature | Description |
-| ------- | ----------- |
-| `ch32v003f4p6` | CH32V003F4P6 chip variant (default) |
-| `rt` | Runtime startup code (reset vector, stack init) |
-| `system-flash` | Bootloader runs from system flash |
-| `defmt` | Enable defmt logging |
+| Feature        | Description                                     |
+| -------------- | ----------------------------------------------- |
+| `ch32v003f4p6` | CH32V003F4P6 chip variant (default)             |
+| `rt`           | Runtime startup code (reset vector, stack init) |
+| `system-flash` | Bootloader runs from system flash               |
+| `defmt`        | Enable defmt logging                            |

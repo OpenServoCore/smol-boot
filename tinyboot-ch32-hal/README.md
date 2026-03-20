@@ -6,14 +6,14 @@ Minimal hardware abstraction layer for tinyboot on CH32 microcontrollers. This i
 
 ## Modules
 
-| Module | Description |
-| ------ | ----------- |
-| `flash` | Flash read/write/erase, option byte access |
+| Module  | Description                                           |
+| ------- | ----------------------------------------------------- |
+| `flash` | Flash read/write/erase, option byte access            |
 | `gpio`  | Pin configuration (input, output, alternate function) |
-| `usart` | UART transmit/receive with embedded-io traits |
-| `rcc`   | Clock configuration |
-| `afio`  | Alternate function I/O and pin remapping |
-| `pfic`  | Interrupt controller and system reset |
+| `usart` | UART transmit/receive with embedded-io traits         |
+| `rcc`   | Clock configuration                                   |
+| `afio`  | Alternate function I/O and pin remapping              |
+| `pfic`  | Interrupt controller and system reset                 |
 
 When `system-flash` is disabled, the `boot_request` module is also available for RAM-based boot request signaling.
 
@@ -28,9 +28,9 @@ This keeps the source chip-agnostic while producing zero-overhead accessors.
 
 ## Features
 
-| Feature | Description |
-| ------- | ----------- |
-| `ch32v003f4p6` | CH32V003F4P6 chip variant (default) |
+| Feature        | Description                                                                   |
+| -------------- | ----------------------------------------------------------------------------- |
+| `ch32v003f4p6` | CH32V003F4P6 chip variant (default)                                           |
 | `system-flash` | Bootloader runs from system flash (uses BOOT_MODE register for boot requests) |
 
 ## Notes

@@ -59,13 +59,14 @@ are preserved across OB erase+rewrite cycles.
 
 ## Boot State Machine
 
-| State | Value | Boot Action |
-|-------|-------|-------------|
-| Idle | 0xFF | Validate app (CRC or blank check) → boot or enter bootloader |
-| Updating | 0x7F | Enter bootloader (transfer was interrupted) |
-| Validating | 0x3F | Consume trial, boot app |
+| State      | Value | Boot Action                                                  |
+| ---------- | ----- | ------------------------------------------------------------ |
+| Idle       | 0xFF  | Validate app (CRC or blank check) → boot or enter bootloader |
+| Updating   | 0x7F  | Enter bootloader (transfer was interrupted)                  |
+| Validating | 0x3F  | Consume trial, boot app                                      |
 
 **Lifecycle:**
+
 1. First Erase command → Idle (0xFF) → Updating (0x7F)
 2. Verify command → writes Validating (0x3F) + checksum to OB
 3. Reset → bootloader sees Validating, consumes trial, boots app
