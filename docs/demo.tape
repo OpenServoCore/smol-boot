@@ -1,4 +1,4 @@
-Output docs/demo.gif
+Output docs/demo.webm
 
 Set Shell "bash"
 Set Width 800
@@ -27,7 +27,7 @@ Sleep 500ms
 
 Type "tinyboot flash --reset --port /dev/ttyACM0 examples/ch32/system-flash/target/riscv32ec-unknown-none-elf/release/app"
 Enter
-Sleep 30s
+Sleep 10s
 
 Ctrl+L
 Sleep 500ms
