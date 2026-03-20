@@ -10,9 +10,24 @@ The existing options didn't fit:
 
 - **CH32 factory bootloader** — Fixed to 115200 baud on PD5/PD6 with no way to configure UART pins, baud rate, or TX-enable for RS-485. Uses a sum-mod-256 checksum that silently drops bad commands with no error response. No CRC verification, no trial boot, no boot state machine. See [ch32v003-bootloader-docs](https://github.com/basilhussain/ch32v003-bootloader-docs) for the reverse-engineered protocol details.
 
-- **embassy-boot** — A well-designed bootloader, but requires ~8KB of flash. That's half the V003's 16KB user flash, and doesn't fit in system flash at all. Not practical for MCUs with 16-32KB total.
+- **[embassy-boot](https://github.com/embassy-rs/embassy/tree/main/embassy-boot)** — A well-designed bootloader, but requires ~8KB of flash. That's half the V003's 16KB user flash, and doesn't fit in system flash at all. Not practical for MCUs with 16-32KB total.
 
 I took it as a challenge to fit a proper bootloader — with a real protocol, CRC16 validation, trial boot, and configurable transport — into the CH32V003's 1920-byte system flash. The key inspiration was [rv003usb](https://github.com/cnlohr/rv003usb) by cnlohr, whose software USB implementation includes a 1920-byte bootloader in system flash. That project proved it was possible to fit meaningful code in that space, and showed me that the entire 16KB of user flash could be left free for the application.
+
+### How it fits in 1920 bytes
+
+Beyond the usual Cargo profile tricks (`opt-level = "z"`, LTO, `codegen-units = 1`, `panic = "abort"`), fitting a real bootloader in 1920 bytes required some more deliberate choices:
+
+- **No HAL crates** — bare metal register access via PAC crates only; HAL abstractions are too expensive for this budget
+- **Custom runtime** — no qingke-rt; the bootloader doesn't need a vector table or interrupts, so the startup code is stripped to the bare minimum (84 bytes of assembly instead of ~1.4KB of full runtime)
+- **Symmetric frame format** — the same `Frame` struct is used for both requests and responses with one shared parse and format path, eliminating code duplication
+- **`repr(C)` frame with union data** — CRC is computed directly over the struct memory via pointer cast; no serialization step, no intermediate buffer
+- **`MaybeUninit` frame buffer** — the 76-byte `Frame` struct is reused every iteration without zero-initialization
+- **Bit-bang CRC16** — no lookup table, trades speed for ~512 bytes of flash savings
+- **OB bit-clear state transitions** — forward state changes (Idle→Updating, trial consumption) flip 1→0 bits without erasing, avoiding the cost of a full erase+rewrite cycle and the code to preserve OB contents
+- **Avoid `memset`/`memcpy`** — these pull in expensive core routines; manual byte loops and volatile writes keep the linker from dragging in library code
+- **`.write()` over `.modify()`** — register writes use direct writes instead of read-modify-write, saving the read and mask operations
+- **Aggressive code deduplication** — shared flash operation primitives across erase, write, and OB operations (see the flash HAL)
 
 ### Design approach
 
