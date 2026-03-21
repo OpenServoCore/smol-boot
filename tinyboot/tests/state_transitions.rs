@@ -5,8 +5,8 @@
 
 use embedded_storage::nor_flash;
 use tinyboot::protocol::Dispatcher;
-use tinyboot::traits::BootState;
 use tinyboot::traits::boot::{BootCtl, BootMetaStore, Platform, Storage, Transport};
+use tinyboot::traits::{BootMode, BootState};
 use tinyboot_protocol::crc::{CRC_INIT, crc16};
 use tinyboot_protocol::frame::Frame;
 use tinyboot_protocol::{Cmd, Status};
@@ -140,7 +140,7 @@ impl BootCtl for MockBootCtl {
     fn is_boot_requested(&self) -> bool {
         false
     }
-    fn system_reset(&mut self, _bootloader: bool) -> ! {
+    fn system_reset(&mut self, _mode: BootMode) -> ! {
         panic!("mock reset")
     }
 }
@@ -149,6 +149,7 @@ struct MockBootMeta {
     state: BootState,
     checksum: u16,
     trials: u8,
+    app_size: u32,
 }
 
 impl MockBootMeta {
@@ -157,6 +158,7 @@ impl MockBootMeta {
             state,
             checksum: 0xFFFF,
             trials: 0xFF,
+            app_size: 0xFFFF_FFFF,
         }
     }
 }
@@ -166,11 +168,14 @@ impl BootMetaStore for MockBootMeta {
     fn boot_state(&self) -> BootState {
         self.state
     }
-    fn trials_remaining(&self) -> u8 {
-        self.trials.count_ones() as u8
+    fn has_trials(&self) -> bool {
+        self.trials != 0
     }
     fn app_checksum(&self) -> u16 {
         self.checksum
+    }
+    fn app_size(&self) -> u32 {
+        self.app_size
     }
     fn advance(&mut self) -> Result<BootState, ()> {
         let next = self.state as u8;
@@ -182,10 +187,11 @@ impl BootMetaStore for MockBootMeta {
         self.trials = self.trials & (self.trials >> 1);
         Ok(())
     }
-    fn refresh(&mut self, checksum: u16, state: BootState) -> Result<(), ()> {
+    fn refresh(&mut self, checksum: u16, state: BootState, app_size: u32) -> Result<(), ()> {
         self.state = state;
         self.checksum = checksum;
         self.trials = 0xFF;
+        self.app_size = app_size;
         Ok(())
     }
 }
@@ -399,7 +405,7 @@ fn write_at_offset() {
 fn verify_from_idle_rejected() {
     let mut p = platform(BootState::Idle);
     let mut d = Dispatcher::new(&mut p);
-    d.platform.transport.load_request(Cmd::Verify, 0, 0, &[]);
+    d.platform.transport.load_request(Cmd::Verify, 4, 0, &[]);
     d.dispatch().unwrap();
     assert_eq!(d.frame.status, Status::Unsupported);
 }
@@ -407,25 +413,51 @@ fn verify_from_idle_rejected() {
 #[test]
 fn verify_from_updating_transitions_to_validating() {
     let mut p = platform(BootState::Updating);
-    p.storage.data[..4].copy_from_slice(&[0x01, 0x02, 0x03, 0x04]);
+    let fw = [0x01, 0x02, 0x03, 0x04];
+    p.storage.data[..4].copy_from_slice(&fw);
+    let app_size = fw.len() as u32;
     let mut d = Dispatcher::new(&mut p);
-    d.platform.transport.load_request(Cmd::Verify, 0, 0, &[]);
+    d.platform
+        .transport
+        .load_request(Cmd::Verify, app_size, 0, &[]);
     d.dispatch().unwrap();
     assert_eq!(d.frame.status, Status::Ok);
     assert_eq!(d.platform.boot_meta.state, BootState::Validating);
     assert_eq!(d.frame.len, 2);
-    let expected = crc16(CRC_INIT, &d.platform.storage.data);
+    let expected = crc16(CRC_INIT, &fw);
     assert_eq!(unsafe { d.frame.data.verify }.crc, expected);
     assert_eq!(d.platform.boot_meta.checksum, expected);
+    assert_eq!(d.platform.boot_meta.app_size, app_size);
 }
 
 #[test]
 fn verify_from_validating_rejected() {
     let mut p = platform(BootState::Validating);
     let mut d = Dispatcher::new(&mut p);
-    d.platform.transport.load_request(Cmd::Verify, 0, 0, &[]);
+    d.platform.transport.load_request(Cmd::Verify, 4, 0, &[]);
     d.dispatch().unwrap();
     assert_eq!(d.frame.status, Status::Unsupported);
+}
+
+#[test]
+fn verify_rejects_zero_app_size() {
+    let mut p = platform(BootState::Updating);
+    let mut d = Dispatcher::new(&mut p);
+    d.platform.transport.load_request(Cmd::Verify, 0, 0, &[]);
+    d.dispatch().unwrap();
+    assert_eq!(d.frame.status, Status::AddrOutOfBounds);
+    assert_eq!(d.platform.boot_meta.state, BootState::Updating);
+}
+
+#[test]
+fn verify_rejects_app_size_exceeding_capacity() {
+    let mut p = platform(BootState::Updating);
+    let mut d = Dispatcher::new(&mut p);
+    // capacity is 256, send 257
+    d.platform.transport.load_request(Cmd::Verify, 257, 0, &[]);
+    d.dispatch().unwrap();
+    assert_eq!(d.frame.status, Status::AddrOutOfBounds);
+    assert_eq!(d.platform.boot_meta.state, BootState::Updating);
 }
 
 // =============================================================================
@@ -463,45 +495,51 @@ fn full_update_cycle() {
     assert_eq!(d.platform.boot_meta.state, BootState::Updating);
 
     // Write: Updating → Updating
-    d.platform
-        .transport
-        .load_request(Cmd::Write, 0, 4, &[0x01, 0x02, 0x03, 0x04]);
+    let fw = [0x01, 0x02, 0x03, 0x04];
+    d.platform.transport.load_request(Cmd::Write, 0, 4, &fw);
     d.dispatch().unwrap();
     assert_eq!(d.frame.status, Status::Ok);
     assert_eq!(d.platform.boot_meta.state, BootState::Updating);
 
-    // Verify: Updating → Validating
-    d.platform.transport.load_request(Cmd::Verify, 0, 0, &[]);
+    // Verify: Updating → Validating (app_size=4)
+    d.platform
+        .transport
+        .load_request(Cmd::Verify, fw.len() as u32, 0, &[]);
     d.dispatch().unwrap();
     assert_eq!(d.frame.status, Status::Ok);
     assert_eq!(d.platform.boot_meta.state, BootState::Validating);
     assert_ne!(d.platform.boot_meta.checksum, 0xFFFF);
+    assert_eq!(d.platform.boot_meta.app_size, fw.len() as u32);
 }
 
 #[test]
 fn reflash_from_validating() {
     let mut p = platform(BootState::Validating);
     p.boot_meta.checksum = 0x1234;
+    p.boot_meta.app_size = 4;
     let mut d = Dispatcher::new(&mut p);
 
-    // Erase: Validating → Updating (reflash, clears checksum)
+    // Erase: Validating → Updating (reflash, clears checksum + app_size)
     d.platform
         .transport
         .load_request(Cmd::Erase, 0, 2, &erase_data(64));
     d.dispatch().unwrap();
     assert_eq!(d.platform.boot_meta.state, BootState::Updating);
     assert_eq!(d.platform.boot_meta.checksum, 0xFFFF);
+    assert_eq!(d.platform.boot_meta.app_size, 0xFFFF_FFFF);
 
     // Write succeeds
-    d.platform
-        .transport
-        .load_request(Cmd::Write, 0, 4, &[0xAB, 0xCD, 0xEF, 0x01]);
+    let fw = [0xAB, 0xCD, 0xEF, 0x01];
+    d.platform.transport.load_request(Cmd::Write, 0, 4, &fw);
     d.dispatch().unwrap();
     assert_eq!(d.frame.status, Status::Ok);
 
     // Verify: Updating → Validating
-    d.platform.transport.load_request(Cmd::Verify, 0, 0, &[]);
+    d.platform
+        .transport
+        .load_request(Cmd::Verify, fw.len() as u32, 0, &[]);
     d.dispatch().unwrap();
     assert_eq!(d.frame.status, Status::Ok);
     assert_eq!(d.platform.boot_meta.state, BootState::Validating);
+    assert_eq!(d.platform.boot_meta.app_size, fw.len() as u32);
 }

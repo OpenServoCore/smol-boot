@@ -1,8 +1,8 @@
 Output docs/demo.gif
 
 Set Shell "bash"
-Set Width 800
-Set Height 400
+Set Width 1200
+Set Height 600
 Set FontSize 14
 Set Padding 20
 Set Theme "Dracula"
@@ -27,7 +27,7 @@ Sleep 500ms
 
 Type "tinyboot flash --reset --port /dev/ttyACM0 examples/ch32/system-flash/target/riscv32ec-unknown-none-elf/release/app"
 Enter
-Sleep 30s
+Sleep 10s
 
 Ctrl+L
 Sleep 500ms

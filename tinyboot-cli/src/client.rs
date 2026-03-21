@@ -170,17 +170,8 @@ impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
             on_progress("Writing", chunk_idx, total_chunks);
         }
 
-        // 4. Verify — compute local CRC over firmware + 0xFF padding to capacity
-        let mut expected_crc = crc16(CRC_INIT, firmware);
-        let pad_len = info.capacity as usize - firmware.len();
-        // Process padding in chunks to avoid large alloc
-        let pad_buf = [0xFFu8; 256];
-        let mut remaining = pad_len;
-        while remaining > 0 {
-            let n = remaining.min(pad_buf.len());
-            expected_crc = crc16(expected_crc, &pad_buf[..n]);
-            remaining -= n;
-        }
+        // 4. Verify — CRC only covers firmware bytes (no padding)
+        let expected_crc = crc16(CRC_INIT, firmware);
 
         self.frame.cmd = Cmd::Verify;
         self.frame.addr = fw_size;
@@ -202,7 +193,7 @@ impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
     /// `bootloader=true` (addr=1): enter bootloader. `bootloader=false` (addr=0): boot app.
     pub fn reset(&mut self, bootloader: bool) {
         self.frame.cmd = Cmd::Reset;
-        self.frame.addr = bootloader as u32;
+        self.frame.addr = u32::from(bootloader);
         self.frame.len = 0;
         self.frame.status = Status::Request;
         let _ = self.frame.send(&mut self.transport);

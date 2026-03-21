@@ -2,7 +2,7 @@
 
 use tinyboot::traits::BootState;
 use tinyboot::traits::app::BootClient as TBBootClient;
-use tinyboot_ch32_hal::{flash, pfic};
+use tinyboot_ch32_hal::{flash, iwdg, pfic};
 
 // Re-exports so apps only need this one crate.
 pub use tinyboot::app::{App, AppConfig};
@@ -26,11 +26,39 @@ pub struct Ch32BootClient;
 impl TBBootClient for Ch32BootClient {
     fn confirm(&mut self) {
         critical_section::with(|_| {
-            if BootState::from_u8(flash::ob_boot_state()) != BootState::Validating {
+            let ob = flash::META_OB_BASE;
+            let state = unsafe { core::ptr::read_volatile(ob as *const u8) };
+            if BootState::from_u8(state) != BootState::Validating {
                 return;
             }
+            // Read current meta, set state=Idle and reset trials
+            let mut meta = [0xFFu8; 8];
+            for (i, slot) in meta.iter_mut().enumerate() {
+                *slot = unsafe { core::ptr::read_volatile((ob + i as u32 * 2) as *const u8) };
+            }
+            meta[0] = BootState::Idle as u8;
+            meta[1] = 0xFF;
+            // Read chip config, erase OB, rewrite
+            let mut buf = [0xFFu8; 16];
+            for (i, slot) in buf[..8].iter_mut().enumerate() {
+                *slot = unsafe {
+                    core::ptr::read_volatile((flash::OB_BASE + i as u32 * 2) as *const u8)
+                };
+            }
+            buf[8..16].copy_from_slice(&meta);
             flash::unlock();
-            flash::ob_refresh(BootState::Idle as u8, flash::ob_checksum());
+            iwdg::feed();
+            let w = flash::FlashWriter::ob();
+            w.erase_start();
+            w.erase(flash::OB_BASE);
+            w.operation_end();
+            w.write_start();
+            for (i, &byte) in buf.iter().enumerate() {
+                if byte != 0xFF {
+                    w.write(flash::OB_BASE + (i as u32 * 2), byte as u16);
+                }
+            }
+            w.operation_end();
             flash::lock();
         });
     }

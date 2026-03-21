@@ -21,7 +21,7 @@ I took it as a challenge to fit a proper bootloader — with a real protocol, CR
 Beyond the usual Cargo profile tricks (`opt-level = "z"`, LTO, `codegen-units = 1`, `panic = "abort"`), fitting a real bootloader in 1920 bytes required some more deliberate choices:
 
 - **No HAL crates** — bare metal register access via PAC crates only; HAL abstractions are too expensive for this budget
-- **Custom runtime** — no qingke-rt; the bootloader doesn't need a vector table or interrupts, so the startup code is stripped to the bare minimum (84 bytes of assembly instead of ~1.4KB of full runtime)
+- **Custom runtime** — no qingke-rt; the bootloader doesn't need a vector table, interrupts, or static initialization, so the startup is just GP/SP init and a jump to main (20 bytes of assembly instead of ~1.4KB of full runtime)
 - **Symmetric frame format** — the same `Frame` struct is used for both requests and responses with one shared parse and format path, eliminating code duplication
 - **`repr(C)` frame with union data** — CRC is computed directly over the struct memory via pointer cast; no serialization step, no intermediate buffer
 - **`MaybeUninit` frame buffer** — the 76-byte `Frame` struct is reused every iteration without zero-initialization

@@ -1,9 +1,10 @@
-/* App version placed at the last 2 bytes of the FLASH region.
- * The bootloader reads this address to report app_version in Info. */
+/* App version placed after all other flash content (end of binary).
+ * The bootloader reads it at flash[app_size-2..app_size] using the
+ * app_size stored in OB metadata. */
 SECTIONS
 {
-    .tinyboot_version ORIGIN(FLASH) + LENGTH(FLASH) - 2 :
+    .tinyboot_version : ALIGN(2)
     {
         KEEP(*(.tinyboot_version));
     } > FLASH
-}
+} INSERT AFTER .data;

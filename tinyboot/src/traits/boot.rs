@@ -1,4 +1,4 @@
-use super::BootState;
+use super::{BootMode, BootState};
 
 /// Trait for firmware transfer protocol.
 pub trait Transport: embedded_io::Read + embedded_io::Write {}
@@ -28,9 +28,8 @@ pub trait BootCtl {
     /// Returns true if the bootloader was explicitly requested (e.g. via boot mode register).
     fn is_boot_requested(&self) -> bool;
 
-    /// Reset the system. `bootloader=true` sets boot mode to enter bootloader,
-    /// `bootloader=false` clears it to boot the app.
-    fn system_reset(&mut self, bootloader: bool) -> !;
+    /// Reset the system into the specified boot mode.
+    fn system_reset(&mut self, mode: BootMode) -> !;
 }
 
 /// Persistent boot metadata storage.
@@ -41,11 +40,14 @@ pub trait BootMetaStore {
     /// Current boot lifecycle state.
     fn boot_state(&self) -> BootState;
 
-    /// Number of trial boots remaining (count of 1-bits in trials field).
-    fn trials_remaining(&self) -> u8;
+    /// Returns true if any trial boots remain.
+    fn has_trials(&self) -> bool;
 
     /// Stored CRC16 of the application firmware.
     fn app_checksum(&self) -> u16;
+
+    /// Stored application size in bytes.
+    fn app_size(&self) -> u32;
 
     /// Step state down by one (1→0 bit clear).
     fn advance(&mut self) -> Result<BootState, Self::Error>;
@@ -53,9 +55,14 @@ pub trait BootMetaStore {
     /// Consume one trial boot (clears one bit in the trials field).
     fn consume_trial(&mut self) -> Result<(), Self::Error>;
 
-    /// Erase meta and rewrite with given checksum and state.
+    /// Erase meta and rewrite with given checksum, state, and app_size.
     /// Trials return to erased default (full).
-    fn refresh(&mut self, checksum: u16, state: BootState) -> Result<(), Self::Error>;
+    fn refresh(
+        &mut self,
+        checksum: u16,
+        state: BootState,
+        app_size: u32,
+    ) -> Result<(), Self::Error>;
 }
 
 /// Concrete platform holding all boot-time peripherals.

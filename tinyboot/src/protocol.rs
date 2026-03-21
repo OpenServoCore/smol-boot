@@ -1,5 +1,5 @@
-use crate::traits::BootState;
 use crate::traits::boot::{BootCtl, BootMetaStore, Platform, Storage, Transport};
+use crate::traits::{BootMode, BootState};
 use tinyboot_protocol::crc::{CRC_INIT, crc16};
 use tinyboot_protocol::frame::{Frame, InfoData, VerifyData};
 use tinyboot_protocol::{Cmd, ReadError, Status};
@@ -49,13 +49,20 @@ impl<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl> Dispatcher<'a, 
                 self.frame.len = 12;
                 let boot_ver =
                     self.platform.storage.boot_base() + self.platform.storage.boot_size() - 2;
-                let app_ver =
-                    self.platform.storage.as_slice().as_ptr() as usize + capacity as usize - 2;
+                let app_sz = self.platform.boot_meta.app_size();
+                let app_ver = if app_sz != 0xFFFF_FFFF {
+                    // SAFETY: app_size != 0xFFFFFFFF means meta was previously written
+                    // by a Verify that validated app_size against capacity.
+                    let base = self.platform.storage.as_slice().as_ptr();
+                    unsafe { base.add(app_sz as usize - 2).cast::<u16>().read_volatile() }
+                } else {
+                    0xFFFF
+                };
                 self.frame.data.info = InfoData {
                     capacity,
                     erase_size: erase_size as u16,
                     boot_version: unsafe { (boot_ver as *const u16).read_volatile() },
-                    app_version: unsafe { (app_ver as *const u16).read_volatile() },
+                    app_version: app_ver,
                     mode: 0,
                 };
             }
@@ -82,7 +89,7 @@ impl<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl> Dispatcher<'a, 
                             if self
                                 .platform
                                 .boot_meta
-                                .refresh(0xFFFF, BootState::Updating)
+                                .refresh(0xFFFF, BootState::Updating, 0xFFFF_FFFF)
                                 .is_err()
                             {
                                 self.frame.status = Status::WriteError;
@@ -129,22 +136,36 @@ impl<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl> Dispatcher<'a, 
                 if state != BootState::Updating {
                     self.frame.status = Status::Unsupported;
                 } else {
-                    let crc = crc16(CRC_INIT, self.platform.storage.as_slice());
-                    self.frame.len = 2;
-                    self.frame.data.verify = VerifyData { crc };
-                    if self
-                        .platform
-                        .boot_meta
-                        .refresh(crc, BootState::Validating)
-                        .is_err()
-                    {
-                        self.frame.status = Status::WriteError;
+                    let app_size = self.frame.addr;
+                    let sz = app_size as usize;
+                    if sz == 0 || sz > capacity as usize {
+                        self.frame.status = Status::AddrOutOfBounds;
+                    } else {
+                        // SAFETY: sz bounds-checked against capacity above.
+                        let crc = crc16(CRC_INIT, unsafe {
+                            self.platform.storage.as_slice().get_unchecked(..sz)
+                        });
+                        self.frame.len = 2;
+                        self.frame.data.verify = VerifyData { crc };
+                        if self
+                            .platform
+                            .boot_meta
+                            .refresh(crc, BootState::Validating, app_size)
+                            .is_err()
+                        {
+                            self.frame.status = Status::WriteError;
+                        }
                     }
                 }
             }
             Cmd::Reset => {
                 let _ = self.frame.send(&mut self.platform.transport);
-                self.platform.ctl.system_reset(self.frame.addr == 1);
+                let mode = if self.frame.addr == 1 {
+                    BootMode::Bootloader
+                } else {
+                    BootMode::App
+                };
+                self.platform.ctl.system_reset(mode);
             }
         }
 

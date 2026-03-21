@@ -55,7 +55,7 @@ fn main() -> ! {
         app_base: APP_BASE,
         app_size: APP_SIZE,
     });
-    let boot_meta = BootMetaStore;
+    let boot_meta = BootMetaStore::default();
     let ctl = BootCtl::new(BootCtlConfig {});
 
     let platform = Platform::new(transport, storage, boot_meta, ctl);
