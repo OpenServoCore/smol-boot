@@ -3,7 +3,7 @@ use embedded_storage::nor_flash::{
 };
 use tinyboot::traits::boot::Storage as StorageTrait;
 
-use tinyboot_ch32_hal::flash::{FlashWriter, PAGE_SIZE};
+use tinyboot_ch32_hal::flash::{BUF_LOAD_SIZE, FlashWriter, PAGE_SIZE};
 
 /// Flash storage configuration.
 pub struct StorageConfig {
@@ -87,20 +87,29 @@ impl NorFlash for Storage {
     }
 
     fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-        if !(offset as usize).is_multiple_of(PAGE_SIZE) || !bytes.len().is_multiple_of(PAGE_SIZE) {
+        if !(offset as usize).is_multiple_of(PAGE_SIZE)
+            || bytes.len() > PAGE_SIZE
+            || !bytes.len().is_multiple_of(BUF_LOAD_SIZE)
+        {
             return Err(StorageError::NotAligned);
         }
         if offset as usize + bytes.len() > self.app_size {
             return Err(StorageError::OutOfBounds);
         }
+        let base = self.app_base + offset;
+        let mut addr = base;
+        let mut ptr = bytes.as_ptr() as *const u32;
         let writer = FlashWriter::usr();
         writer.write_start();
-        let mut addr = self.app_base + offset;
-        for pair in bytes.chunks_exact(2) {
-            let halfword = u16::from_le_bytes([pair[0], pair[1]]);
-            writer.write(addr, halfword);
-            addr += 2;
+        writer.fast_write_buf_reset();
+        for _ in 0..bytes.len() / BUF_LOAD_SIZE {
+            // SAFETY: ptr advances within bounds, read_unaligned handles alignment
+            let word = unsafe { ptr.read_unaligned() };
+            writer.fast_write_buf_load(addr, word);
+            addr += BUF_LOAD_SIZE as u32;
+            ptr = unsafe { ptr.add(1) };
         }
+        writer.fast_write_page_program(base);
         writer.operation_end();
 
         // See erase() for rationale on debug-only write-protection check.

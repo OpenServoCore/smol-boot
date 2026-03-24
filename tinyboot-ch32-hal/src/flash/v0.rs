@@ -35,6 +35,9 @@ pub struct FlashWriter {
 /// Flash page size in bytes (erase and fast-write granularity).
 pub const PAGE_SIZE: usize = 64;
 
+/// Fast-write buffer load size in bytes.
+pub const BUF_LOAD_SIZE: usize = 4;
+
 const FTPG: u8 = 16; // FTPG bit - fast page programming - 64B
 const FTER: u8 = 17; // FTER bit - fast page erase - 64B
 const BUFRST: u8 = 18; // BUFRST bit - fast-program buffer reset
