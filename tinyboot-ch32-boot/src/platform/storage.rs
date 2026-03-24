@@ -3,10 +3,7 @@ use embedded_storage::nor_flash::{
 };
 use tinyboot::traits::boot::Storage as StorageTrait;
 
-use tinyboot_ch32_hal::flash::FlashWriter;
-
-const FLASH_WRITE_SIZE: usize = 2;
-const FLASH_ERASE_SIZE: usize = 64;
+use tinyboot_ch32_hal::flash::{FlashWriter, PAGE_SIZE};
 
 /// Flash storage configuration.
 pub struct StorageConfig {
@@ -59,13 +56,11 @@ impl ErrorType for Storage {
 }
 
 impl NorFlash for Storage {
-    const WRITE_SIZE: usize = FLASH_WRITE_SIZE;
-    const ERASE_SIZE: usize = FLASH_ERASE_SIZE;
+    const WRITE_SIZE: usize = PAGE_SIZE;
+    const ERASE_SIZE: usize = PAGE_SIZE;
 
     fn erase(&mut self, from: u32, to: u32) -> Result<(), Self::Error> {
-        if !(from as usize).is_multiple_of(FLASH_ERASE_SIZE)
-            || !(to as usize).is_multiple_of(FLASH_ERASE_SIZE)
-        {
+        if !(from as usize).is_multiple_of(PAGE_SIZE) || !(to as usize).is_multiple_of(PAGE_SIZE) {
             return Err(StorageError::NotAligned);
         }
         if to as usize > self.app_size {
@@ -77,7 +72,7 @@ impl NorFlash for Storage {
         let end = self.app_base + to;
         while addr < end {
             writer.erase(addr);
-            addr += FLASH_ERASE_SIZE as u32;
+            addr += PAGE_SIZE as u32;
         }
         writer.operation_end();
         // Write-protection check is debug-only: unlock() disables protection
@@ -92,9 +87,7 @@ impl NorFlash for Storage {
     }
 
     fn write(&mut self, offset: u32, bytes: &[u8]) -> Result<(), Self::Error> {
-        if !(offset as usize).is_multiple_of(FLASH_WRITE_SIZE)
-            || !bytes.len().is_multiple_of(FLASH_WRITE_SIZE)
-        {
+        if !(offset as usize).is_multiple_of(PAGE_SIZE) || !bytes.len().is_multiple_of(PAGE_SIZE) {
             return Err(StorageError::NotAligned);
         }
         if offset as usize + bytes.len() > self.app_size {
