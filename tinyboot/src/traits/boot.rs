@@ -89,6 +89,7 @@ where
     C: BootCtl,
 {
     /// Assemble a platform from its components.
+    #[inline(always)]
     pub fn new(transport: T, storage: S, boot_meta: B, ctl: C, boot_version: u16) -> Self {
         Self {
             transport,

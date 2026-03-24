@@ -70,6 +70,7 @@ impl tinyboot::traits::boot::Transport for Usart {}
 
 impl Usart {
     /// Initialize the USART peripheral with the given configuration.
+    #[inline(always)]
     pub fn new(config: &UsartConfig) -> Self {
         let tx_pin = config.mapping.tx_pin();
         let rx_pin = config.mapping.rx_pin();

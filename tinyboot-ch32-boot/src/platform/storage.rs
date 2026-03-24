@@ -41,6 +41,7 @@ pub struct Storage {
 
 impl Storage {
     /// Create storage from configuration.
+    #[inline(always)]
     pub fn new(config: StorageConfig) -> Self {
         Storage {
             app_base: config.app_base,

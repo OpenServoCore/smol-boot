@@ -25,6 +25,7 @@ pub struct BootMetaStore {
 
 impl Default for BootMetaStore {
     /// Read all OB metadata into the struct from option bytes.
+    #[inline(always)]
     fn default() -> Self {
         let mut meta = core::mem::MaybeUninit::<Self>::uninit();
         let ptr = meta.as_mut_ptr() as *mut u8;
