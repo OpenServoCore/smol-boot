@@ -18,6 +18,7 @@ pub fn unlock() {
 }
 
 /// Lock flash controller.
+#[inline(always)]
 pub fn lock() {
     FLASH.ctlr().write(|w| {
         w.set_lock(true);
