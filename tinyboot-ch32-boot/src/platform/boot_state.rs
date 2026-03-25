@@ -24,9 +24,10 @@ pub struct BootMetaStore {
 }
 
 impl Default for BootMetaStore {
-    /// Read all OB metadata into the struct from option bytes.
+    /// Unlock flash and read all OB metadata from option bytes.
     #[inline(always)]
     fn default() -> Self {
+        tinyboot_ch32_hal::flash::unlock();
         let mut meta = core::mem::MaybeUninit::<Self>::uninit();
         let ptr = meta.as_mut_ptr() as *mut u8;
         for i in 0..8 {
