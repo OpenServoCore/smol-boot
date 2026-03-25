@@ -21,6 +21,7 @@ Implements the `tinyboot::traits::boot::Platform` trait by composing four compon
 use tinyboot_ch32_boot::{
     BaudRate, BootCtl, BootCtlConfig, BootMetaStore, Core, Duplex,
     Platform, Pull, Storage, StorageConfig, Usart, UsartConfig, UsartMapping,
+    pkg_version,
 };
 
 let transport = Usart::new(&UsartConfig {
@@ -33,17 +34,26 @@ let transport = Usart::new(&UsartConfig {
 });
 
 let storage = Storage::new(StorageConfig {
-    boot_base: 0x1FFF_F000,
-    boot_size: 1920,
     app_base: 0x0800_0000,
     app_size: 16 * 1024,
 });
 
-let platform = Platform::new(transport, storage, BootMetaStore::default(), BootCtl::new(BootCtlConfig {}));
+let boot_meta = BootMetaStore::default();
+let ctl = BootCtl::new(BootCtlConfig {});
+
+const BOOT_VER: u16 = pkg_version!();
+let platform = Platform::new(transport, storage, boot_meta, ctl, BOOT_VER);
 Core::new(platform).run();
 ```
 
 See [`examples/ch32/system-flash`](../examples/ch32/system-flash/) for a complete bootloader example.
+
+## Runtime
+
+The bootloader includes two startup assembly files, selected by the `defmt` feature:
+
+- **`v2.S`** (default) — minimal startup (GP/SP init + jump to main, ~20 bytes). Omits .data/.bss init since the system-flash bootloader uses no mutable statics.
+- **`v2_full.S`** (`defmt` enabled) — full startup with .data copy and .bss zeroing, required for defmt-rtt and safe app→bootloader resets.
 
 ## Features
 

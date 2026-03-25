@@ -69,3 +69,11 @@ If `--port` is omitted, the CLI probes all available serial ports by sending an 
 When given an ELF file, the CLI extracts ALLOC sections using physical addresses (LMA) from PT_LOAD segments. Sections named `.uninit*` are skipped. LMAs below `0x0800_0000` are adjusted by adding the CH32 flash base offset.
 
 Raw binary files (no ELF magic) are used as-is.
+
+## Logging
+
+Set `RUST_LOG` for protocol-level diagnostics:
+
+```sh
+RUST_LOG=debug tinyboot flash firmware.elf
+```

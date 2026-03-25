@@ -21,7 +21,7 @@ I took it as a challenge to fit a proper bootloader — with a real protocol, CR
 Beyond the usual Cargo profile tricks (`opt-level = "z"`, LTO, `codegen-units = 1`, `panic = "abort"`), fitting a real bootloader in 1920 bytes required some more deliberate choices:
 
 - **No HAL crates** — bare metal register access via PAC crates only; HAL abstractions are too expensive for this budget
-- **Custom runtime** — no qingke-rt; the bootloader doesn't need a vector table, interrupts, or static initialization, so the startup is just GP/SP init and a jump to main (20 bytes of assembly instead of ~1.4KB of full runtime)
+- **Custom runtime** — no qingke-rt; the system-flash bootloader startup (`v2.S`) is just GP/SP init and a jump to main (20 bytes of assembly instead of ~1.4KB of full runtime). A full startup variant (`v2_full.S`) with .data/.bss init is used when defmt logging is enabled
 - **Symmetric frame format** — the same `Frame` struct is used for both requests and responses with one shared parse and format path, eliminating code duplication
 - **`repr(C)` frame with union data** — CRC is computed directly over the struct memory via pointer cast; no serialization step, no intermediate buffer
 - **`MaybeUninit` frame buffer** — the 76-byte `Frame` struct is reused every iteration without zero-initialization
@@ -166,7 +166,7 @@ The crates use `unsafe` in targeted places, primarily to meet the extreme size c
 - **`transmute`** — enum conversions (boot state) and function pointer cast for jump-to-address
 - **`from_raw_parts`** — zero-copy flash slice access in the storage layer
 - **Linker section attributes** — placing version data and boot metadata at fixed flash addresses
-- **`export_name` / `extern "C"`** — runtime entry points and linker symbol access
+- **`export_name` / `extern "C"` / linker `--wrap`** — runtime entry points, linker symbol access, and `fix_mtvec!` macro that wraps `_setup_interrupts` to fix interrupt vectors for apps loaded behind a user-flash bootloader
 - **Critical section impl** — no-op implementation since the bootloader runs with interrupts disabled
 
 These are deliberate trade-offs — safe alternatives would pull in extra code that doesn't fit. The unsafe is confined to data layout, memory access, and hardware boundaries; the bootloader state machine and protocol logic are safe Rust.
