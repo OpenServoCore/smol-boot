@@ -1,8 +1,8 @@
-/* Place app version at the last 2 bytes of the FLASH region.
+/* Place app version immediately after all other flash content.
  * The bootloader reads it at storage[app_size - 2]. */
 SECTIONS
 {
-    .tinyboot_version ORIGIN(FLASH) + LENGTH(FLASH) - 2 :
+    .tinyboot_version ALIGN(2) :
     {
         KEEP(*(.tinyboot_version));
     } > FLASH

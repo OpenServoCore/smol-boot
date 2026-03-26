@@ -158,17 +158,25 @@ impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
             on_progress("Erasing", erase_addr, erase_total);
         }
 
-        // 3. Write — chunk by MAX_PAYLOAD
-        let total_chunks = firmware.len().div_ceil(MAX_PAYLOAD) as u32;
+        // 3. Write — chunk by MAX_PAYLOAD, pad to 4-byte alignment with 0xFF
+        let padded_len = firmware.len().next_multiple_of(4);
+        let total_chunks = padded_len.div_ceil(MAX_PAYLOAD) as u32;
         let mut offset = 0usize;
         let mut chunk_idx = 0u32;
-        while offset < firmware.len() {
-            let end = (offset + MAX_PAYLOAD).min(firmware.len());
-            let chunk = &firmware[offset..end];
+        while offset < padded_len {
+            let end = (offset + MAX_PAYLOAD).min(padded_len);
+            let len = end - offset;
+            // Copy firmware bytes, pad remainder with 0xFF
+            let fw_end = end.min(firmware.len());
+            let fw_bytes = fw_end.saturating_sub(offset);
+            unsafe {
+                self.frame.data.raw[..fw_bytes]
+                    .copy_from_slice(&firmware[offset..offset + fw_bytes]);
+                self.frame.data.raw[fw_bytes..len].fill(0xFF);
+            }
             self.frame.cmd = Cmd::Write;
             self.frame.addr = offset as u32;
-            self.frame.len = chunk.len() as u16;
-            unsafe { self.frame.data.raw[..chunk.len()].copy_from_slice(chunk) };
+            self.frame.len = len as u16;
             self.transact()?;
             offset = end;
             chunk_idx += 1;
@@ -178,7 +186,7 @@ impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
         // 4. Flush buffered writes
         self.flush()?;
 
-        // 5. Verify — CRC only covers firmware bytes (no padding)
+        // 5. Verify — CRC covers original firmware bytes only (not padding)
         let expected_crc = crc16(CRC_INIT, firmware);
 
         self.frame.cmd = Cmd::Verify;
