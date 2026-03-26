@@ -59,6 +59,7 @@ jobs:
     name: Examples
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         example: [system-flash, user-flash]
     defaults:
