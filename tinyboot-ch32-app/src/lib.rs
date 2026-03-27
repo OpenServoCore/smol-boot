@@ -109,11 +109,14 @@ impl TBBootClient for Ch32BootClient {
 /// Create an [`App`] configured for CH32 hardware.
 ///
 /// Reads boot version from flash at `boot_base + boot_size - 2`.
+/// Pass `tinyboot_ch32_app::pkg_version!()` as `app_version` so the
+/// calling crate's version is used (not this library's).
 pub fn new_app(
     boot_base: u32,
     boot_size: u32,
     app_size: u32,
     erase_size: u16,
+    app_version: u16,
 ) -> App<Ch32BootClient> {
     let boot_ver_addr = (boot_base + boot_size - 2) as *const u16;
     App::new(
@@ -121,7 +124,7 @@ pub fn new_app(
             capacity: app_size,
             erase_size,
             boot_version: unsafe { boot_ver_addr.read_volatile() },
-            app_version: pkg_version!(),
+            app_version,
         },
         Ch32BootClient,
     )

@@ -14,6 +14,7 @@
 #![no_main]
 
 use defmt_rtt as _;
+tinyboot_ch32_boot::boot_version!();
 
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {

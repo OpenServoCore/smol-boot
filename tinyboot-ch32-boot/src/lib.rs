@@ -32,6 +32,13 @@ pub fn run(platform: Platform<Usart, Storage, BootMetaStore, BootCtl>) -> ! {
     tinyboot::Core::<_, _, _, _, PROTOCOL_BUF_SIZE>::new(platform).run()
 }
 
-#[unsafe(link_section = ".tinyboot_version")]
-#[used]
-static BOOT_VERSION: u16 = tinyboot_protocol::pkg_version!();
+/// Define the `.tinyboot_version` static using the calling crate's version.
+/// Place this at module scope in your bootloader binary.
+#[macro_export]
+macro_rules! boot_version {
+    () => {
+        #[unsafe(link_section = ".tinyboot_version")]
+        #[used]
+        static _BOOT_VERSION: u16 = $crate::pkg_version!();
+    };
+}

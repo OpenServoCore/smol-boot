@@ -12,6 +12,7 @@
 #![no_main]
 
 use panic_halt as _;
+tinyboot_ch32_boot::boot_version!();
 
 use tinyboot_ch32_boot::{
     BaudRate, BootCtl, BootCtlConfig, BootMetaStore, Duplex, Platform, Pull, Storage,
