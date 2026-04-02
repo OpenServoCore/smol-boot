@@ -13,7 +13,7 @@ jobs:
     name: Libraries
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
       - run: cargo fmt --all -- --check
       - run: cargo clippy -p tinyboot -p tinyboot-protocol --all-targets -- -D warnings
@@ -29,7 +29,7 @@ jobs:
       run:
         working-directory: tinyboot-cli
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - run: rustup toolchain install stable --profile minimal --component rustfmt,clippy
       - run: cargo fmt --all -- --check
@@ -69,11 +69,12 @@ jobs:
             target: riscv32imc-unknown-none-elf
             target-flags: ""
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Install toolchain
         run: |
-          rustup toolchain install nightly --profile minimal --component rust-src,rustfmt,clippy
+          rustup toolchain install nightly --profile minimal --component rust-src,rustfmt,clippy,llvm-tools
           rustup +nightly target add ${{ matrix.target }} 2>/dev/null || true
+          cargo install cargo-binutils
           mkdir -p /tmp/sizes
       - name: Clippy libraries
         run: cargo +nightly clippy -p tinyboot-ch32-hal -p tinyboot-ch32-boot -p tinyboot-ch32-app --features ${{ matrix.chip }} --target ${{ matrix.target }} ${{ matrix.target-flags }} -- -D warnings
@@ -134,7 +135,6 @@ jobs:
           merge-multiple: true
           path: /tmp/sizes
       - name: Generate size table
-        id: table
         run: |
           CSV=/tmp/sizes/sizes.csv
           {
@@ -147,6 +147,6 @@ jobs:
             done
           } > /tmp/sizes/comment.md
       - name: Post PR comment
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: marocchino/sticky-pull-request-comment@v3
         with:
           path: /tmp/sizes/comment.md
