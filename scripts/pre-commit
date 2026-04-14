@@ -17,11 +17,6 @@ CHIP=ch32v003f4p6
 
 # --- Examples ---
 for flash in system-flash user-flash; do
-  if [ "$flash" = "user-flash" ]; then
-    DF="--no-default-features"
-  else
-    DF=""
-  fi
-  (cd examples/ch32/v003 && cargo +nightly clippy -p boot $DF --features "ch32v003f4p6,$flash" -- -D warnings)
-  (cd examples/ch32/v003 && cargo +nightly clippy -p app $DF --features "ch32v003f4p6,$flash" -- -D warnings)
+  (cd examples/ch32/v003 && cargo +nightly clippy -p boot --no-default-features --features "ch32v003f4p6,$flash" -- -D warnings)
+  (cd examples/ch32/v003 && cargo +nightly clippy -p app --no-default-features --features "ch32v003f4p6,$flash" -- -D warnings)
 done
