@@ -21,21 +21,15 @@ use ch32_hal::timer::low_level::Timer;
 use ch32_hal::usart::{self, Uart};
 use critical_section::Mutex;
 
-#[cfg(feature = "user-flash")]
 use defmt_rtt as _;
 
+#[cfg(feature = "user-flash")]
+tinyboot_ch32_app::fix_mtvec!();
 tinyboot_ch32_app::app_version!();
 
-#[cfg(feature = "user-flash")]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     defmt::error!("panic");
-    loop {}
-}
-
-#[cfg(feature = "system-flash")]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
@@ -50,33 +44,14 @@ const APP_SIZE: u32 = 16 * 1024 - 64;
 #[cfg(feature = "user-flash")]
 const BOOT_BASE: u32 = 0x0800_0000;
 #[cfg(feature = "user-flash")]
-const BOOT_SIZE: u32 = 8 * 1024;
+const BOOT_SIZE: u32 = 2 * 1024;
 #[cfg(feature = "user-flash")]
-const APP_SIZE: u32 = 8 * 1024 - 64;
+const APP_SIZE: u32 = 14 * 1024 - 64;
 
 const ERASE_SIZE: u16 = 64;
 
 type Shared<T> = Mutex<RefCell<Option<T>>>;
 static LED: Shared<Output<'static>> = Mutex::new(RefCell::new(None));
-
-#[qingke_rt::interrupt]
-fn TIM2() {
-    pac::TIM2.intfr().modify(|w| w.set_uif(false));
-    critical_section::with(|cs| {
-        if let Some(ref mut led) = *LED.borrow_ref_mut(cs) {
-            led.toggle();
-            #[cfg(feature = "user-flash")]
-            if led.is_set_high() {
-                defmt::info!("LED on");
-            } else {
-                defmt::info!("LED off");
-            }
-        }
-    });
-}
-
-#[cfg(feature = "user-flash")]
-tinyboot_ch32_app::fix_mtvec!();
 
 #[qingke_rt::entry]
 fn main() -> ! {
@@ -111,10 +86,24 @@ fn main() -> ! {
     let mut app = tinyboot_ch32_app::new_app(BOOT_BASE, BOOT_SIZE, APP_SIZE, ERASE_SIZE);
     app.confirm();
 
-    #[cfg(feature = "user-flash")]
     defmt::info!("Boot confirmed, app ready.");
 
     loop {
         app.poll(&mut rx, &mut tx);
     }
+}
+
+#[qingke_rt::interrupt]
+fn TIM2() {
+    pac::TIM2.intfr().modify(|w| w.set_uif(false));
+    critical_section::with(|cs| {
+        if let Some(ref mut led) = *LED.borrow_ref_mut(cs) {
+            led.toggle();
+            if led.is_set_high() {
+                defmt::info!("LED on");
+            } else {
+                defmt::info!("LED off");
+            }
+        }
+    });
 }

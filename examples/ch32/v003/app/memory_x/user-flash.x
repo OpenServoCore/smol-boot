@@ -4,8 +4,8 @@
  * boot metadata regions.
  *
  * Flash map (see boot/memory.x for the full picture):
- *   0x0000_0000 .. 0x0000_1FFF  bootloader   8KB
- *   0x0000_2000 .. 0x0000_3FBF  application  8KB - 64B
+ *   0x0000_0000 .. 0x0000_07FF  bootloader   2KB
+ *   0x0000_0800 .. 0x0000_3FBF  application  14KB - 64B
  *   0x0000_3FC0 .. 0x0000_3FFF  boot meta    64B
  *
  * Note: addresses here use the code-execution alias (0x0000_0000 base).
@@ -13,7 +13,7 @@
  */
 MEMORY
 {
-    FLASH : ORIGIN = 0x00000000 + 8K, LENGTH = 8K - 64
+    FLASH : ORIGIN = 0x00000000 + 2K, LENGTH = 14K - 64
     META  : ORIGIN = 0x00000000 + 16K - 64, LENGTH = 64
     RAM   : ORIGIN = 0x20000000, LENGTH = 2K
 }

@@ -24,9 +24,9 @@ use tinyboot_ch32_boot::{
 const APP_BASE: u32 = 0x0800_0000;
 
 #[cfg(feature = "user-flash")]
-const APP_BASE: u32 = 0x0800_2000;
+const APP_BASE: u32 = 0x0800_0800;
 #[cfg(feature = "user-flash")]
-const APP_ENTRY: u32 = 0x0000_2000;
+const APP_ENTRY: u32 = 0x0000_0800;
 
 #[unsafe(export_name = "main")]
 fn main() -> ! {

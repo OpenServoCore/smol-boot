@@ -40,6 +40,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d084b0137aaa901caf9f1e8b21daa6aa24d41cd806e111335541eff9683bd6"
 
 [[package]]
+name = "boot"
+version = "1.2.3"
+dependencies = [
+ "panic-halt",
+ "tinyboot-ch32-boot",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -380,6 +388,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "panic-halt"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a513e167849a384b7f9b746e517604398518590a9142f4846a32e3c2a4de7b11"
+
+[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -621,6 +635,17 @@ dependencies = [
  "embedded-io 0.7.1",
  "embedded-io-async 0.7.0",
  "qingke",
+ "tinyboot-ch32-hal",
+ "tinyboot-core",
+ "tinyboot-protocol",
+]
+
+[[package]]
+name = "tinyboot-ch32-boot"
+version = "0.2.1"
+dependencies = [
+ "embedded-io 0.7.1",
+ "embedded-storage",
  "tinyboot-ch32-hal",
  "tinyboot-core",
  "tinyboot-protocol",
