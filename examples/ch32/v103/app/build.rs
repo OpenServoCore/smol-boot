@@ -24,7 +24,6 @@ fn main() {
     println!("cargo:rustc-link-arg=-Ttb-app.x");
     println!("cargo:rustc-link-arg=-Ttb-boot-req.x");
     println!("cargo:rustc-link-arg=-Tdefmt.x");
-
 }
 
 fn cfg_has(key: &str) -> bool {

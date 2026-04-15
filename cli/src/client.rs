@@ -182,9 +182,9 @@ impl<T: embedded_io::Read + embedded_io::Write> Client<T> {
                 Err(FlashError::Device(Status::CrcMismatch)) => {
                     // Response frame corrupted — flush device write buffer
                     // and restart from the nearest page-aligned offset.
-                    debug!("response CRC mismatch at offset {offset:#X}, flushing and retrying from page boundary");
+                    debug!("CRC mismatch at {offset:#X}, retrying from page boundary");
                     let _ = self.flush();
-                    offset = offset & !(page_size - 1);
+                    offset &= !(page_size - 1);
                     chunk_idx = (offset / MAX_PAYLOAD) as u32;
                     continue;
                 }
