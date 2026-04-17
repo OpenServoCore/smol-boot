@@ -20,22 +20,25 @@ pub struct BootCtl {
 }
 
 impl BootCtl {
-    #[cfg(boot_req_gpio)]
-    #[inline(always)]
-    pub fn new(pin: Pin, active_high: bool, reset_delay_cycles: u32) -> Self {
-        Self {
-            req: boot_request::Active::new(pin, active_high, reset_delay_cycles),
-            hand_off: hand_off::Active::new(),
+    core::cfg_select! {
+        boot_req_gpio => {
+            #[inline(always)]
+            pub fn new(pin: Pin, active_high: bool, reset_delay_cycles: u32) -> Self {
+                Self {
+                    req: boot_request::Active::new(pin, active_high, reset_delay_cycles),
+                    hand_off: hand_off::Active::new(),
+                }
+            }
         }
-    }
-
-    #[cfg(not(boot_req_gpio))]
-    #[inline(always)]
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
-        Self {
-            req: boot_request::Active::new(),
-            hand_off: hand_off::Active::new(),
+        _ => {
+            #[inline(always)]
+            #[allow(clippy::new_without_default)]
+            pub fn new() -> Self {
+                Self {
+                    req: boot_request::Active::new(),
+                    hand_off: hand_off::Active::new(),
+                }
+            }
         }
     }
 }
