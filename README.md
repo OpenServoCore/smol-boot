@@ -135,7 +135,7 @@ Low-level register access shared between the boot and app crates. Provides the b
 
 ### 2. Create a boot crate (`tinyboot-{chip}-boot`)
 
-Implements the core boot traits using the HAL. Four traits from `tinyboot_core::traits::boot`:
+Implements the core boot traits using the HAL. Four traits from `tinyboot_core::traits`:
 
 | Trait           | What to implement                                                                                                                         |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
@@ -146,7 +146,7 @@ Implements the core boot traits using the HAL. Four traits from `tinyboot_core::
 
 ### 3. Create an app crate (`tinyboot-{chip}-app`)
 
-Implements `tinyboot_core::traits::app::BootClient` using the HAL:
+Implements `tinyboot_core::traits::BootClient` using the HAL:
 
 - `confirm()` — transition boot state from Validating back to Idle
 - `request_update()` — set your boot request flag

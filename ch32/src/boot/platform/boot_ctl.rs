@@ -1,5 +1,5 @@
+use tinyboot::traits::BootCtl as TBBootCtl;
 use tinyboot::traits::BootMode;
-use tinyboot::traits::boot::BootCtl as TBBootCtl;
 
 use crate::hal::{boot_request, pfic};
 

@@ -8,9 +8,9 @@
 static __tb_version: u16 = 0xFFFF;
 
 use embedded_storage::nor_flash;
+use tinyboot_core::Platform;
 use tinyboot_core::protocol::Dispatcher;
-use tinyboot_core::traits::boot::{BootCtl, BootMetaStore, Platform, Storage, Transport};
-use tinyboot_core::traits::{BootMode, BootState};
+use tinyboot_core::traits::{BootCtl, BootMetaStore, BootMode, BootState, Storage, Transport};
 use tinyboot_protocol::crc::{CRC_INIT, crc16};
 use tinyboot_protocol::frame::Frame;
 use tinyboot_protocol::{Cmd, Status};

@@ -1,6 +1,6 @@
+use crate::platform::Platform;
 use crate::protocol;
-use crate::traits::boot::{BootCtl, BootMetaStore, Platform, Storage, Transport};
-use crate::traits::{BootMode, BootState};
+use crate::traits::{BootCtl, BootMetaStore, BootMode, BootState, Storage, Transport};
 
 /// Bootloader entry point. Checks boot state, validates the app, and either
 /// boots the application or enters the protocol loop for firmware updates.

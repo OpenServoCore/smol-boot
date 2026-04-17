@@ -1,6 +1,6 @@
+use crate::platform::Platform;
 use crate::ringbuf::RingBuf;
-use crate::traits::boot::{BootCtl, BootMetaStore, Platform, Storage, Transport};
-use crate::traits::{BootMode, BootState};
+use crate::traits::{BootCtl, BootMetaStore, BootMode, BootState, Storage, Transport};
 use tinyboot_protocol::crc::{CRC_INIT, crc16};
 use tinyboot_protocol::frame::{Frame, InfoData, VerifyData};
 use tinyboot_protocol::{Cmd, ReadError, Status};

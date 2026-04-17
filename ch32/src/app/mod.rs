@@ -1,7 +1,7 @@
 //! CH32 app-side tinyboot client.
 
+use tinyboot::traits::BootClient as TBBootClient;
 use tinyboot::traits::BootState;
-use tinyboot::traits::app::BootClient as TBBootClient;
 
 use crate::hal::{boot_request, flash, iwdg, pfic};
 
@@ -9,7 +9,7 @@ use crate::hal::{boot_request, flash, iwdg, pfic};
 pub use crate::hal::Pin;
 pub use boot_request::Config as BootCtlConfig;
 pub use tinyboot::app::{App, AppConfig};
-pub use tinyboot::traits::app as traits;
+pub use tinyboot::traits;
 pub use tinyboot::{app_version, pkg_version};
 
 /// CH32 boot client implementation.

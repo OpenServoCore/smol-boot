@@ -1,4 +1,44 @@
-use super::{BootMode, BootState};
+//! Platform abstraction traits.
+
+/// Boot target after a system reset.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BootMode {
+    /// Boot the application.
+    App,
+    /// Enter the bootloader.
+    Bootloader,
+}
+
+/// Current stage in the firmware update lifecycle.
+///
+/// Each state is a contiguous run of 1-bits from bit 0.
+/// Advancing clears the MSB: `next = state & (state >> 1)`.
+///
+/// ```text
+/// 0xFF  Idle        (8 ones)
+/// 0x7F  Updating    (7 ones)
+/// 0x3F  Validating  (6 ones)
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum BootState {
+    /// No update in progress. Normal app boot. Erased flash default.
+    Idle = 0xFF,
+    /// Firmware transfer in progress.
+    Updating = 0x7F,
+    /// New firmware written, trial booting the app.
+    Validating = 0x3F,
+}
+
+impl BootState {
+    /// Parse a raw byte into a [`BootState`]. Unrecognised values default to [`Idle`](BootState::Idle).
+    pub fn from_u8(v: u8) -> Self {
+        match v {
+            0xFF | 0x7F | 0x3F => unsafe { core::mem::transmute::<u8, BootState>(v) },
+            _ => BootState::Idle,
+        }
+    }
+}
 
 /// Trait for firmware transfer protocol.
 pub trait Transport: embedded_io::Read + embedded_io::Write {}
@@ -59,41 +99,21 @@ pub trait BootMetaStore {
     ) -> Result<(), Self::Error>;
 }
 
-/// Concrete platform holding all boot-time peripherals.
+/// App-side boot client interface.
 ///
-/// Constructed by the board-specific crate and passed to [`Core::new`](crate::Core::new).
-pub struct Platform<T, S, B, C>
-where
-    T: Transport,
-    S: Storage,
-    B: BootMetaStore,
-    C: BootCtl,
-{
-    /// UART / RS-485 transport.
-    pub transport: T,
-    /// Flash storage for reading and writing firmware.
-    pub storage: S,
-    /// Persistent boot metadata (state, trials, checksum).
-    pub boot_meta: B,
-    /// Boot control (reset, boot mode selection).
-    pub ctl: C,
-}
+/// Provides the operations an application needs from the bootloader:
+/// confirming a successful trial boot, requesting bootloader entry
+/// for a firmware update, and performing a system reset.
+pub trait BootClient {
+    /// Confirm a successful boot.
+    ///
+    /// If the boot state is `Validating`, refreshes metadata back to Idle.
+    /// Otherwise does nothing (already confirmed or no update in progress).
+    fn confirm(&mut self);
 
-impl<T, S, B, C> Platform<T, S, B, C>
-where
-    T: Transport,
-    S: Storage,
-    B: BootMetaStore,
-    C: BootCtl,
-{
-    /// Assemble a platform from its components.
-    #[inline(always)]
-    pub fn new(transport: T, storage: S, boot_meta: B, ctl: C) -> Self {
-        Self {
-            transport,
-            storage,
-            boot_meta,
-            ctl,
-        }
-    }
+    /// Set the boot request flag so the next reset enters the bootloader.
+    fn request_update(&mut self);
+
+    /// Reset the system. This function does not return.
+    fn system_reset(&mut self) -> !;
 }

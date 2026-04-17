@@ -14,7 +14,7 @@ pub use platform::{
 // Re-exports so boot examples only need this one module.
 pub use crate::hal::gpio::Pull;
 pub use crate::hal::{Pin, UsartMapping};
-pub use tinyboot::traits::boot::Platform;
+pub use tinyboot::Platform;
 pub use tinyboot::{boot_version, pkg_version};
 
 /// Common imports for bootloader binaries.
@@ -32,7 +32,7 @@ pub const PAGE_SIZE: usize = crate::hal::flash::PAGE_SIZE;
 /// Sets up storage, boot metadata, and boot control from linker symbols,
 /// then enters the boot state machine. Does not return.
 #[inline(always)]
-pub fn run(transport: impl tinyboot::traits::boot::Transport, config: BootCtlConfig) -> ! {
+pub fn run(transport: impl tinyboot::traits::Transport, config: BootCtlConfig) -> ! {
     let platform = Platform::new(
         transport,
         Storage::default(),

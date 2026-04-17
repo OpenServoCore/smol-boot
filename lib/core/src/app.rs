@@ -3,7 +3,7 @@
 //! Handles boot confirmation and responds to host commands (Info, Reset)
 //! so the CLI can query and reset the device without physical access.
 
-use crate::traits::app::BootClient;
+use crate::traits::BootClient;
 use tinyboot_protocol::frame::{Frame, InfoData};
 use tinyboot_protocol::{Cmd, Status};
 

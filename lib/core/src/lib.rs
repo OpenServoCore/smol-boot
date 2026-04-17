@@ -4,12 +4,14 @@
 //! Platform-agnostic bootloader core.
 //!
 //! Implements the boot state machine, protocol dispatcher, and app validation.
-//! Platform-specific behaviour is injected via the traits in [`traits::boot`].
+//! Platform-specific behaviour is injected via the traits in [`traits`].
 
 /// App-side tinyboot client (poll, confirm, command handling).
 pub mod app;
 /// Boot state machine and entry point.
 pub mod core;
+/// Boot-time platform container.
+pub mod platform;
 /// Protocol frame dispatcher.
 pub mod protocol;
 /// Fixed-size ring buffer for buffered flash writes.
@@ -18,6 +20,7 @@ pub mod ringbuf;
 pub mod traits;
 
 pub use crate::core::Core;
+pub use crate::platform::Platform;
 
 // Re-export so version macros can use `$crate::pkg_version!()`.
 #[doc(hidden)]
