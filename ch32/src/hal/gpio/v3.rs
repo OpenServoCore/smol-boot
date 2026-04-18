@@ -1,0 +1,93 @@
+use core::convert::Infallible;
+
+use super::super::Pin;
+
+#[derive(Copy, Clone)]
+pub enum Pull {
+    None,
+    Up,
+    Down,
+}
+
+#[derive(Copy, Clone, PartialEq)]
+pub enum Level {
+    Low,
+    High,
+}
+
+/// Packed pin config: `[ODR_HIGH(1) | ODR_LOW(1) | _(2) | CNF(2) | MODE(2)]`.
+///
+/// Bits 3:0 = CFGLR/CFGHR nibble (MODE low, CNF high). Bits 7/6 set ODR high/low.
+/// MODE: INPUT=00, OUTPUT_10MHZ=01. CNF<<2: PP=00, FLOAT/OD=01, PULL/AF_PP=10, AF_OD=11.
+#[derive(Copy, Clone)]
+pub struct PinMode(u8);
+
+impl PinMode {
+    pub const INPUT_FLOATING: Self = Self(0b0100);
+    pub const INPUT_PULL_UP: Self = Self(0b1000 | 0x80);
+    pub const INPUT_PULL_DOWN: Self = Self(0b1000 | 0x40);
+    pub const OUTPUT_PUSH_PULL: Self = Self(0b0001);
+    pub const OUTPUT_OPEN_DRAIN: Self = Self(0b0101);
+    pub const AF_PUSH_PULL: Self = Self(0b1001);
+    pub const AF_OPEN_DRAIN: Self = Self(0b1101);
+
+    pub fn input_pull(pull: Pull) -> Self {
+        match pull {
+            Pull::Up => Self::INPUT_PULL_UP,
+            Pull::Down => Self::INPUT_PULL_DOWN,
+            Pull::None => Self::INPUT_FLOATING,
+        }
+    }
+}
+
+#[inline(always)]
+pub fn configure(pin: Pin, mode: PinMode) {
+    let regs = pin.gpio_regs();
+    let n = pin.pin_number();
+
+    let shift = (n % 8) * 4;
+    let mask = !(0xFu32 << shift);
+    let bits = ((mode.0 & 0x0F) as u32) << shift;
+
+    if n < 8 {
+        let prev = regs.cfglr().read().0;
+        regs.cfglr()
+            .write_value(ch32_metapac::gpio::regs::Cfglr(prev & mask | bits));
+    } else {
+        let prev = regs.cfghr().read().0;
+        regs.cfghr()
+            .write_value(ch32_metapac::gpio::regs::Cfghr(prev & mask | bits));
+    }
+
+    if mode.0 & 0xC0 != 0 {
+        let mut outdr = regs.outdr().read();
+        outdr.set_odr(n, mode.0 & 0x80 != 0);
+        regs.outdr().write_value(outdr);
+    }
+}
+
+pub fn set_level(pin: Pin, level: Level) {
+    if level == Level::High {
+        pin.gpio_regs()
+            .bshr()
+            .write(|w| w.0 = 1 << pin.pin_number());
+    } else {
+        pin.gpio_regs().bcr().write(|w| w.0 = 1 << pin.pin_number());
+    }
+}
+
+impl embedded_hal::digital::ErrorType for Pin {
+    type Error = Infallible;
+}
+
+impl embedded_hal::digital::OutputPin for Pin {
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        set_level(*self, Level::High);
+        Ok(())
+    }
+
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        set_level(*self, Level::Low);
+        Ok(())
+    }
+}

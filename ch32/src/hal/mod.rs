@@ -1,0 +1,21 @@
+//! Chip-level register access (flash, gpio, usart, …).
+
+mod generated {
+    include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+}
+pub use generated::{Pin, UsartMapping};
+
+pub mod afio;
+pub mod flash;
+pub mod gpio;
+pub mod iwdg;
+pub mod pfic;
+pub mod rcc;
+pub mod usart;
+
+#[inline(always)]
+pub fn delay_cycles(n: u32) {
+    for _ in 0..n {
+        core::hint::spin_loop();
+    }
+}

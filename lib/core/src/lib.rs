@@ -3,13 +3,15 @@
 
 //! Platform-agnostic bootloader core.
 //!
-//! Implements the boot state machine, protocol dispatcher, and app validation.
-//! Platform-specific behaviour is injected via the traits in [`traits::boot`].
+//! Boot state machine, protocol dispatcher, app validation. Platform-specific
+//! behaviour is injected via the traits in [`traits`].
 
-/// App-side tinyboot client (poll, confirm, command handling).
+/// App-side tinyboot client.
 pub mod app;
 /// Boot state machine and entry point.
 pub mod core;
+/// Boot-time platform container.
+pub mod platform;
 /// Protocol frame dispatcher.
 pub mod protocol;
 /// Fixed-size ring buffer for buffered flash writes.
@@ -18,15 +20,12 @@ pub mod ringbuf;
 pub mod traits;
 
 pub use crate::core::Core;
+pub use crate::platform::Platform;
 
-// Re-export so version macros can use `$crate::pkg_version!()`.
 #[doc(hidden)]
 pub use tinyboot_protocol::pkg_version;
 
-/// Read the version from the `__tb_version` linker symbol.
-///
-/// This symbol is defined by `tb-boot.x` / `tb-app.x` and points to the
-/// `.tb_version` section populated by [`boot_version!`] or [`app_version!`].
+/// Read the version packed into the `.tb_version` section.
 #[inline(always)]
 pub fn tinyboot_version() -> u16 {
     unsafe extern "C" {
@@ -35,8 +34,8 @@ pub fn tinyboot_version() -> u16 {
     unsafe { ::core::ptr::read_volatile(&raw const __tb_version) }
 }
 
-/// Define the `.tb_version` static using the calling crate's version.
-/// Place this at module scope in your bootloader binary.
+/// Place the calling crate's version into `.tb_version`. Use at module scope
+/// in a bootloader binary.
 #[macro_export]
 macro_rules! boot_version {
     () => {
@@ -46,8 +45,8 @@ macro_rules! boot_version {
     };
 }
 
-/// Define the `.tb_version` static using the calling crate's version.
-/// Place this at module scope in your application binary.
+/// Place the calling crate's version into `.tb_version`. Use at module scope
+/// in an app binary.
 #[macro_export]
 macro_rules! app_version {
     () => {

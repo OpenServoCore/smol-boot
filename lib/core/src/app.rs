@@ -1,9 +1,7 @@
-//! App-side tinyboot client.
-//!
-//! Handles boot confirmation and responds to host commands (Info, Reset)
-//! so the CLI can query and reset the device without physical access.
+//! App-side tinyboot client. Handles boot confirmation and responds to
+//! Info/Reset commands so the CLI can drive updates without physical access.
 
-use crate::traits::app::BootClient;
+use crate::traits::{BootCtl, BootMetaStore, BootState, RunMode};
 use tinyboot_protocol::frame::{Frame, InfoData};
 use tinyboot_protocol::{Cmd, Status};
 
@@ -13,36 +11,44 @@ pub struct AppConfig {
     pub capacity: u32,
     /// Erase page size in bytes.
     pub erase_size: u16,
-    /// Boot version (read from flash by the caller).
+    /// Boot version (caller reads it from flash).
     pub boot_version: u16,
-    /// App version (typically from `pkg_version!()`).
+    /// App version, typically `pkg_version!()`.
     pub app_version: u16,
 }
 
-/// App-side tinyboot client. Handles Info/Reset commands and boot confirmation.
-pub struct App<B: BootClient> {
+/// App-side tinyboot client.
+pub struct App<C: BootCtl, M: BootMetaStore> {
     frame: Frame,
     config: AppConfig,
-    client: B,
+    ctl: C,
+    meta: M,
 }
 
-impl<B: BootClient> App<B> {
+impl<C: BootCtl, M: BootMetaStore> App<C, M> {
     /// Create a new app client.
-    pub fn new(config: AppConfig, client: B) -> Self {
+    pub fn new(config: AppConfig, ctl: C, meta: M) -> Self {
         Self {
             frame: Frame::default(),
             config,
-            client,
+            ctl,
+            meta,
         }
     }
 
-    /// Confirm boot — transitions Validating to Idle, preserving checksum.
-    /// Call after all peripherals are initialized.
+    /// Validating → Idle. Runs in a critical section; feed the watchdog first.
     pub fn confirm(&mut self) {
-        self.client.confirm();
+        critical_section::with(|_| {
+            if self.meta.boot_state() != BootState::Validating {
+                return;
+            }
+            let checksum = self.meta.app_checksum();
+            let app_size = self.meta.app_size();
+            let _ = self.meta.refresh(checksum, BootState::Idle, app_size);
+        });
     }
 
-    /// Poll for tinyboot commands (blocking).
+    /// Poll for one command (blocking).
     pub fn poll<R: embedded_io::Read, W: embedded_io::Write>(&mut self, rx: &mut R, tx: &mut W) {
         let status = match self.frame.read(rx) {
             Ok(s) => s,
@@ -60,7 +66,7 @@ impl<B: BootClient> App<B> {
         }
     }
 
-    /// Poll for tinyboot commands (async).
+    /// Poll for one command (async).
     pub async fn poll_async<R: embedded_io_async::Read, W: embedded_io_async::Write>(
         &mut self,
         rx: &mut R,
@@ -97,9 +103,9 @@ impl<B: BootClient> App<B> {
             }
             Cmd::Reset => {
                 if self.frame.addr == 1 {
-                    self.client.request_update();
+                    self.ctl.set_run_mode(RunMode::Service);
                 }
-                self.client.system_reset();
+                self.ctl.reset();
             }
             _ => {
                 self.frame.len = 0;
