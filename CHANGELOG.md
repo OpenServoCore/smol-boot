@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Switched `ch32-metapac` to git in preparation for V00x support.
 - **Breaking:** merged `tinyboot-ch32-hal`, `tinyboot-ch32-boot`, and `tinyboot-ch32-app` into a single `tinyboot-ch32` crate (`::boot`, `::app`, `::hal` modules).
 - **Breaking:** replaced `BootMode` with `RunMode { HandOff, Service }`, and reshaped `BootCtl` around `run_mode()`/`set_run_mode()`, `reset()`, and `hand_off()`.
 - **Breaking:** `tinyboot_core::traits` flattened; `BootClient` gone, app behaviour moved to `tinyboot_core::app::App`.
