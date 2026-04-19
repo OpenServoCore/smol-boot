@@ -3,13 +3,13 @@ use crate::ringbuf::RingBuf;
 use crate::traits::{BootCtl, BootMetaStore, BootState, RunMode, Storage, Transport};
 use tinyboot_protocol::crc::{CRC_INIT, crc16};
 use tinyboot_protocol::frame::{Frame, InfoData, VerifyData};
-use tinyboot_protocol::{Cmd, ReadError, Status};
+use tinyboot_protocol::{Cmd, ReadError, ResetFlags, Status, WriteFlags};
 
 /// Protocol dispatcher with write buffering.
 ///
 /// Writes are accumulated in a ring buffer and flushed a page at a time.
-/// The host must `Flush` before `Verify` or before skipping to a non-sequential
-/// address, otherwise the trailing partial page is lost.
+/// The host sets [`WriteFlags::FLUSH`] on the last write of each contiguous
+/// region to commit the trailing partial page.
 pub struct Dispatcher<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl, const BUF: usize>
 {
     /// Platform peripherals.
@@ -59,6 +59,8 @@ impl<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl, const BUF: usiz
         }
 
         let data_len = self.frame.len as usize;
+        let addr = self.frame.addr();
+        let flags = self.frame.flags;
         let capacity = self.platform.storage.capacity() as u32;
         let erase_size = S::ERASE_SIZE as u32;
         let write_size = S::WRITE_SIZE as u32;
@@ -87,7 +89,7 @@ impl<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl, const BUF: usiz
                 };
             }
             Cmd::Erase => {
-                let addr = self.frame.addr;
+
                 let byte_count = unsafe { self.frame.data.erase }.byte_count as u32;
                 if !addr.is_multiple_of(erase_size)
                     || !byte_count.is_multiple_of(erase_size)
@@ -131,7 +133,9 @@ impl<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl, const BUF: usiz
                 if state != BootState::Updating {
                     self.frame.status = Status::Unsupported;
                 } else {
-                    let addr = self.frame.addr;
+    
+                    let flush = unsafe { flags.write }.contains(WriteFlags::FLUSH);
+
                     if addr + data_len as u32 > capacity
                         || (self.next_addr.is_none() && !addr.is_multiple_of(write_size))
                         || self.next_addr.is_some_and(|n| n != addr)
@@ -146,6 +150,13 @@ impl<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl, const BUF: usiz
                         if self.buf.len() >= S::WRITE_SIZE {
                             self.write_buf(next, S::WRITE_SIZE);
                         }
+                        if flush {
+                            if !self.buf.is_empty() {
+                                self.write_buf(next, self.buf.len());
+                            }
+                            self.buf.reset();
+                            self.next_addr = None;
+                        }
                     }
                 }
             }
@@ -153,7 +164,7 @@ impl<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl, const BUF: usiz
                 if state != BootState::Updating {
                     self.frame.status = Status::Unsupported;
                 } else {
-                    let app_size = self.frame.addr;
+                    let app_size = addr;
                     let sz = app_size as usize;
                     if sz == 0 || sz > capacity as usize {
                         self.frame.status = Status::AddrOutOfBounds;
@@ -177,22 +188,13 @@ impl<'a, T: Transport, S: Storage, B: BootMetaStore, C: BootCtl, const BUF: usiz
             }
             Cmd::Reset => {
                 let _ = self.frame.send(&mut self.platform.transport);
-                let mode = if self.frame.addr == 1 {
+                let mode = if unsafe { flags.reset }.contains(ResetFlags::BOOTLOADER) {
                     RunMode::Service
                 } else {
                     RunMode::HandOff
                 };
                 self.platform.ctl.set_run_mode(mode);
                 self.platform.ctl.reset();
-            }
-            Cmd::Flush => {
-                if let Some(next) = self.next_addr {
-                    if !self.buf.is_empty() {
-                        self.write_buf(next, self.buf.len());
-                    }
-                    self.buf.reset();
-                    self.next_addr = None;
-                }
             }
         }
 
