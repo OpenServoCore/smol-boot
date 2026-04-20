@@ -12,10 +12,10 @@ Note: BOOT1 is tied to GND in both circuits.
 
 ## BOOT_CTL GPIO Truth Table
 
-| BOOT_CTL           | Effect                        |
-| ------------------ | ----------------------------- |
-| HIGH               | Boots system flash (tinyboot) |
-| LOW                | Boots user flash (app)        |
+| BOOT_CTL | Effect                        |
+| -------- | ----------------------------- |
+| HIGH     | Boots system flash (tinyboot) |
+| LOW      | Boots user flash (app)        |
 
 ## Circuit Option 1: RC (Recommended)
 

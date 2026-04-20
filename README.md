@@ -10,34 +10,22 @@ Rust bootloader for resource-constrained microcontrollers. Fits in the CH32V003'
 
 ## Chip Compatibility
 
-tinyboot currently supports **UART / RS-485** transport. The table below tracks chip support status. Chips with hardware boot pins (e.g. BOOT0/BOOT1) require a small external circuit to allow firmware-controlled boot mode switching. Please see [GPIO-Controlled Boot Mode Selection](docs/boot-ctl.md) document for more information.
+tinyboot currently supports **UART / RS-485** transport. Chips with hardware boot pins (e.g. BOOT0/BOOT1) require a small external circuit for firmware-controlled boot mode switching — see [GPIO-Controlled Boot Mode Selection](docs/boot-ctl.md).
 
-✅ Verified | ❓ Untested (same die, likely works — volunteer needed) | 📋 Planned
+| Family                                          | System Flash              | Status       |
+| ----------------------------------------------- | ------------------------- | ------------ |
+| **CH32V003**                                    | `0x1FFFF000` (1920B)      | ✅ Supported |
+| **CH32V00x** (V002 / V004 / V005 / V006 / V007) | `0x1FFF0000` (3KB + 256B) | ✅ Supported |
+| **CH32V103**                                    | `0x1FFFF000` (2048B)      | ✅ Supported |
+| **CH32X03x** (X033 / X034 / X035)               | `0x1FFF0000` (3KB + 256B) | 📋 Planned   |
 
-| Chip         | Feature Flag   | System Flash              | Status |
-| ------------ | -------------- | ------------------------- | ------ |
-| CH32V003F4P6 | `ch32v003f4p6` | `0x1FFFF000` (1920B)      | ✅     |
-| CH32V003A4M6 | `ch32v003a4m6` | `0x1FFFF000` (1920B)      | ❓     |
-| CH32V003F4U6 | `ch32v003f4u6` | `0x1FFFF000` (1920B)      | ❓     |
-| CH32V003J4M6 | `ch32v003j4m6` | `0x1FFFF000` (1920B)      | ❓     |
-| CH32V103C6T6 | `ch32v103c6t6` | `0x1FFFF000` (2048B)      | ❓     |
-| CH32V103C8T6 | `ch32v103c8t6` | `0x1FFFF000` (2048B)      | ✅     |
-| CH32V103C8U6 | `ch32v103c8u6` | `0x1FFFF000` (2048B)      | ❓     |
-| CH32V103R8T6 | `ch32v103r8t6` | `0x1FFFF000` (2048B)      | ❓     |
-| CH32V002X4X6 | `ch32v002x4x6` | `0x1FFF0000` (3KB + 256B) | ❓     |
-| CH32V004X6X1 | `ch32v004x6x1` | `0x1FFF0000` (3KB + 256B) | ❓     |
-| CH32V005X6X6 | `ch32v005x6x6` | `0x1FFF0000` (3KB + 256B) | ❓     |
-| CH32V006X8X6 | `ch32v006x8x6` | `0x1FFF0000` (3KB + 256B) | ✅     |
-| CH32V007X8X6 | `ch32v007x8x6` | `0x1FFF0000` (3KB + 256B) | ❓     |
-| CH32X033F8P6 | `ch32x033f8p6` | `0x1FFF0000` (3KB + 256B) | 📋     |
-| CH32X034F8P6 | `ch32x034f8p6` | `0x1FFF0000` (3KB + 256B) | 📋     |
-| CH32X034F8U6 | `ch32x034f8u6` | `0x1FFF0000` (3KB + 256B) | 📋     |
-| CH32X035C8T6 | `ch32x035c8t6` | `0x1FFF0000` (3KB + 256B) | 📋     |
-| CH32X035F7P6 | `ch32x035f7p6` | `0x1FFF0000` (3KB + 256B) | 📋     |
-| CH32X035F8U6 | `ch32x035f8u6` | `0x1FFF0000` (3KB + 256B) | 📋     |
-| CH32X035G8R6 | `ch32x035g8r6` | `0x1FFF0000` (3KB + 256B) | 📋     |
-| CH32X035G8U6 | `ch32x035g8u6` | `0x1FFF0000` (3KB + 256B) | 📋     |
-| CH32X035R8T6 | `ch32x035r8t6` | `0x1FFF0000` (3KB + 256B) | 📋     |
+### Supported feature flags
+
+| Family   | Feature flags                                                                  |
+| -------- | ------------------------------------------------------------------------------ |
+| CH32V003 | `ch32v003f4p6`, `ch32v003a4m6`, `ch32v003f4u6`, `ch32v003j4m6`                 |
+| CH32V00x | `ch32v002x4x6`, `ch32v004x6x1`, `ch32v005x6x6`, `ch32v006x8x6`, `ch32v007x8x6` |
+| CH32V103 | `ch32v103c6t6`, `ch32v103c8t6`, `ch32v103c8u6`, `ch32v103r8t6`                 |
 
 ## Features
 
