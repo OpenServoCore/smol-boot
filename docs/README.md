@@ -20,6 +20,7 @@ If you're new here, start with the [top-level README](https://github.com/OpenSer
 ## Reference
 
 - [Porting to a new MCU family](porting.md)
+- [Adding a new chip series](porting-series.md)
 - [Design notes](design.md) — motivation, the 1920-byte budget, unsafe policy
 - [Protocol reference](https://github.com/OpenServoCore/tinyboot/tree/main/lib/protocol) — wire format, frames, commands
 - [Boot state machine](https://github.com/OpenServoCore/tinyboot/tree/main/lib/core) — state transitions, metadata layout

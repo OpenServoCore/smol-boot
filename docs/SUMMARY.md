@@ -18,6 +18,7 @@
 # Reference
 
 - [Porting to a new MCU](porting.md)
+- [Adding a new chip series](porting-series.md)
 - [Design notes](design.md)
 
 # Troubleshooting

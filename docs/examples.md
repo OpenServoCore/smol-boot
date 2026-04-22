@@ -1,6 +1,6 @@
 # Building your bootloader from an example
 
-The `examples/` directory holds complete, buildable boot + app projects for each supported chip family. They double as CI test targets, which is why they look more structured than a typical example — but they're also the fastest way to start your own project: copy the one that matches your chip and trim it down.
+The `examples/` directory holds complete, buildable boot + app projects for each supported chip series. They double as CI test targets, which is why they look more structured than a typical example — but they're also the fastest way to start your own project: copy the one that matches your chip and trim it down.
 
 This page walks through what's in an example, what you need to change, and what you can delete.
 
@@ -13,7 +13,7 @@ examples/ch32/
   v103/      CH32V103 (needs BOOT_CTL circuit for system-flash mode)
 ```
 
-Each chip directory is a Cargo workspace with two members:
+Each series directory is a Cargo workspace with two members:
 
 ```
 v003/
@@ -38,12 +38,12 @@ v003/
 
 The example workspaces are built across a CI matrix: multiple chip variants × system-flash / user-flash modes. Features like `ch32v003f4p6`, `system-flash`, `user-flash` exist so CI can re-use the same source tree for every combination.
 
-**For your own project, you don't need any of that.** Pick one chip variant and one flash mode; pin them as defaults in your boot crate's `Cargo.toml`; delete the rest.
+**For your own project, you don't need any of that.** Pick one variant and one flash mode; pin them as defaults in your boot crate's `Cargo.toml`; delete the rest.
 
 ## Starting your own project from an example
 
 1. Copy the example that matches your chip (e.g. `examples/ch32/v003/`) to a new directory.
-2. In the `boot/Cargo.toml`, remove the extra chip-variant features you don't need. Leave one, set as the default.
+2. In the `boot/Cargo.toml`, remove the extra variant features you don't need. Leave one, set as the default.
 3. Pick a flash mode. Delete the `memory_x/` file you don't need, and simplify `build.rs` to just copy the remaining one.
 4. In `src/main.rs`, change the UART config (pins, baud, duplex, tx_en) to match your board.
 5. Do the same for `app/` — match the UART config, adjust your pins.
@@ -66,7 +66,7 @@ tinyboot-ch32-rt = "0.4"
 
 Every tinyboot `memory.x` defines the same five regions: `CODE`, `BOOT`, `APP`, `META`, `RAM`. The linker scripts shipped by `tinyboot-core` derive all the chip-agnostic symbols (`__tb_*`) from those regions — you don't need to poke at magic addresses. See the [porting guide](porting.md#linker-region-contract) for the contract.
 
-If you change chip variants (e.g. V003F4P6 → V003A4M6), the defaults in `memory.x` are usually fine — you only need to adjust if your part has non-standard RAM / flash sizes.
+If you change variants (e.g. V003F4P6 → V003A4M6), the defaults in `memory.x` are usually fine — you only need to adjust if your part has non-standard RAM / flash sizes.
 
 ## `build.rs` and linker scripts
 

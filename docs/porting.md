@@ -1,6 +1,6 @@
 # Porting to a new MCU family
 
-Adding a new chip within an existing family (e.g. another CH32 variant) is straightforward — add the register definitions to the existing HAL module and a feature flag. No new crates needed.
+Adding a new chip series within an existing family (e.g. V00x alongside V003 in the CH32 family) is covered in [Adding a new chip series](porting-series.md).
 
 Porting to an entirely new MCU family (e.g. STM32) requires a parallel crate. The core crates (`tinyboot-core`, `tinyboot-protocol`, `tinyboot`) are platform-agnostic — you implement four traits and provide a minimal HAL. Here's what that looks like.
 
@@ -27,7 +27,7 @@ If your chip needs a custom `_start` + linker script to fit a small bootloader �
 
 ## 3. Create an example workspace
 
-Add `examples/{chip}/{variant}/` with boot + app binaries. Each provides a `memory.x` defining the five standard regions (`CODE`, `BOOT`, `APP`, `META`, `RAM`). The core linker scripts (`tb-boot.x`, `tb-app.x`, `tb-run-mode.x`) handle the rest.
+Add `examples/{family}/{series}/` with boot + app binaries. Each provides a `memory.x` defining the five standard regions (`CODE`, `BOOT`, `APP`, `META`, `RAM`). The core linker scripts (`tb-boot.x`, `tb-app.x`, `tb-run-mode.x`) handle the rest.
 
 ### Linker region contract
 
@@ -47,4 +47,4 @@ The entire protocol (frame format, CRC, sync, commands), the boot state machine 
 
 ## Before starting a port
 
-Please [open an issue](https://github.com/OpenServoCore/tinyboot/issues) so we can discuss the approach. Some chip families have surprises (boot-pin muxing, flash write granularity, clock domain quirks) that we've already run into on CH32 and can share context on.
+Please [open an issue](https://github.com/OpenServoCore/tinyboot/issues) so we can discuss the approach. Some families have surprises (boot-pin muxing, flash write granularity, clock domain quirks) that we've already run into on CH32 and can share context on.

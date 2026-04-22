@@ -16,7 +16,7 @@ Picking a mode is controlled by a Cargo feature on your **boot** crate — the a
 
 ## Mode capacities
 
-| Chip family | System flash size | User flash size | System-flash mode | User-flash mode |
+| Chip series | System flash size | User flash size | System-flash mode | User-flash mode |
 | ----------- | ----------------- | --------------- | ----------------- | --------------- |
 | CH32V003    | 1920 B            | 16 KB           | ✅ Supported      | ✅ Supported    |
 | CH32V00x    | 3 KB + 256 B      | 16–64 KB        | ✅ Supported      | ✅ Supported    |
