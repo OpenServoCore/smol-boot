@@ -8,4 +8,4 @@ pub use crate::hal::{Pin, UsartMapping};
 pub use boot_ctl::BootCtl;
 pub use boot_meta_store::BootMetaStore;
 pub use storage::Storage;
-pub use transport::usart::{BaudRate, Duplex, TxEnConfig, Usart, UsartConfig};
+pub use transport::usart::{BaudRate, TxEnConfig, Usart, UsartConfig};

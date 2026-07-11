@@ -20,7 +20,7 @@ tinyboot-ch32-rt = "0.4"  # optional, bootloader-only; on crates.io
 
 | Module     | For                  | What it provides                                                                                 |
 | ---------- | -------------------- | ------------------------------------------------------------------------------------------------ |
-| `boot`     | Bootloader binaries  | `run()`, `BootCtl`, USART transport (`Usart`, `UsartConfig`, `BaudRate`, `Duplex`, `TxEnConfig`) |
+| `boot`     | Bootloader binaries  | `run()`, `BootCtl`, USART transport (`Usart`, `UsartConfig`, `BaudRate`, `TxEnConfig`) |
 | `app`      | Application binaries | `new_app()`, `App`, `BootCtl`, the `tinyboot_core::app` types                                    |
 | `hal`      | Both                 | `flash`, `gpio`, `usart`, `afio`, `rcc`, `pfic`, `iwdg`; auto-generated `Pin` and `UsartMapping` |
 | `platform` | (internal)           | `tinyboot_core::traits` impls for Storage, Transport, BootCtl, BootMetaStore                     |
@@ -38,7 +38,6 @@ use tinyboot_ch32::boot::prelude::*;
 #[unsafe(export_name = "main")]
 fn main() -> ! {
     let transport = Usart::new(&UsartConfig {
-        duplex: Duplex::Full,
         baud: BaudRate::B115200,
         pclk: 8_000_000,
         mapping: UsartMapping::Usart1Remap0,

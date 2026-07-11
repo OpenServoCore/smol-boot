@@ -21,7 +21,6 @@ fn main() -> ! {
     //   Remap0 (default): TX=PA9, RX=PA10
     //   Remap1:           TX=PB6, RX=PB7
     let transport = Usart::new(&UsartConfig {
-        duplex: Duplex::Full,
         baud: BaudRate::B115200,
         pclk: 8_000_000,
         mapping: UsartMapping::Usart1Remap0,

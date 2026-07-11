@@ -2,16 +2,11 @@ use core::convert::Infallible;
 
 use embedded_io::ErrorType;
 
-use crate::hal::gpio::{PinMode, Pull};
+use crate::hal::gpio::PinMode;
+#[cfg(not(feature = "half-duplex"))]
+use crate::hal::gpio::Pull;
 use crate::hal::{Pin, UsartMapping};
 use crate::hal::{afio, gpio, rcc, usart};
-
-pub enum Duplex {
-    /// Half-duplex (single wire, RS-485).
-    Half,
-    /// Full-duplex (separate TX/RX).
-    Full,
-}
 
 #[derive(Copy, Clone)]
 #[repr(u32)]
@@ -41,7 +36,6 @@ pub struct TxEnConfig {
 }
 
 pub struct UsartConfig {
-    pub duplex: Duplex,
     pub baud: BaudRate,
     /// USART peripheral clock (Hz). Used for BRR = pclk / baud.
     ///
@@ -51,6 +45,8 @@ pub struct UsartConfig {
     ///   X0xx: HSI 48MHz / HPRE 1 = 48_000_000
     pub pclk: u32,
     pub mapping: UsartMapping,
+    /// RX pin bias (full duplex only).
+    #[cfg(not(feature = "half-duplex"))]
     pub rx_pull: Pull,
     /// Optional RS-485 DE/RE pin.
     pub tx_en: Option<TxEnConfig>,
@@ -59,6 +55,9 @@ pub struct UsartConfig {
 pub struct Usart {
     regs: crate::hal::usart::Regs,
     tx_en: Option<TxEnConfig>,
+    /// The single wire: push-pull while driving, open-drain parked.
+    #[cfg(feature = "half-duplex")]
+    tx_pin: Pin,
 }
 
 impl tinyboot_core::traits::Transport for Usart {}
@@ -71,7 +70,6 @@ impl Usart {
         let tx_pin = config.mapping.tx_pin();
         let rx_pin = config.mapping.rx_pin();
         let regs = config.mapping.regs();
-        let half_duplex = matches!(config.duplex, Duplex::Half);
 
         let usart_n = config.mapping.peripheral_index();
 
@@ -89,8 +87,13 @@ impl Usart {
 
         afio::set_usart_remap(usart_n, config.mapping.remap_value());
 
-        gpio::configure(tx_pin, PinMode::AF_PUSH_PULL);
-        if !half_duplex {
+        // Park the single wire open-drain: RX hears through the pin, the
+        // bus pull-up holds mark; writes flip to push-pull.
+        #[cfg(feature = "half-duplex")]
+        gpio::configure(tx_pin, PinMode::AF_OPEN_DRAIN);
+        #[cfg(not(feature = "half-duplex"))]
+        {
+            gpio::configure(tx_pin, PinMode::AF_PUSH_PULL);
             gpio::configure(rx_pin, PinMode::input_pull(config.rx_pull));
         }
 
@@ -101,16 +104,25 @@ impl Usart {
             gpio::set_level(tx_en.pin, invert(tx_en.tx_level));
         }
 
-        usart::init(regs, config.pclk, config.baud as u32, half_duplex);
+        usart::init(
+            regs,
+            config.pclk,
+            config.baud as u32,
+            cfg!(feature = "half-duplex"),
+        );
 
         Usart {
             regs,
             tx_en: config.tx_en,
+            #[cfg(feature = "half-duplex")]
+            tx_pin,
         }
     }
 
     #[inline(always)]
     fn set_tx_mode(&self) {
+        #[cfg(feature = "half-duplex")]
+        gpio::configure(self.tx_pin, PinMode::AF_PUSH_PULL);
         if let Some(ref tx_en) = self.tx_en {
             gpio::set_level(tx_en.pin, tx_en.tx_level);
         }
@@ -118,6 +130,8 @@ impl Usart {
 
     #[inline(always)]
     fn set_rx_mode(&self) {
+        #[cfg(feature = "half-duplex")]
+        gpio::configure(self.tx_pin, PinMode::AF_OPEN_DRAIN);
         if let Some(ref tx_en) = self.tx_en {
             gpio::set_level(tx_en.pin, invert(tx_en.tx_level));
         }
