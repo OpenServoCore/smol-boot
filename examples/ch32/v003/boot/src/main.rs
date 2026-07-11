@@ -24,11 +24,9 @@ fn main() -> ! {
     //
     // rx_pull: Pull::Up for floating lines; Pull::None if externally pulled up.
     //
-    // RS-485 half-duplex with DE pin:
-    //   duplex: Duplex::Half,
-    //   tx_en: Some(TxEnConfig { pin: Pin::PC2, tx_level: Level::High }),
+    // Single-wire half duplex: enable tinyboot-ch32's `half-duplex`
+    // feature (drops `rx_pull`; the wire needs a pull-up).
     let transport = Usart::new(&UsartConfig {
-        duplex: Duplex::Full,
         baud: BaudRate::B115200,
         pclk: 8_000_000,
         mapping: UsartMapping::Usart1Remap0,

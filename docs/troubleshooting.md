@@ -28,6 +28,7 @@ Something in the UART chain isn't right. Work through these in order:
 - **`rx_pull`** — floating RX lines need `Pull::Up`; externally pulled-up lines should use `Pull::None`.
 - **RS-485 / DXL TTL** — a DE/RE pin must be configured via `TxEnConfig`, with `tx_level` matching the transceiver's DE polarity.
 - **Half-duplex contention** — on some boards the programmer's TX driver and the MCU's TX driver both reach MCU_RX. Flipping `tx_level` (so the MCU's side is tri-stated while idle) often resolves it. See the [transports guide](transports.md).
+- **Half-duplex missing pull-up** — the `half-duplex` feature parks the pin open-drain while idle, so the wire needs an external pull-up to hold mark between frames. A floating wire reads as noise and framing errors. See the [transports guide](transports.md).
 
 ---
 
