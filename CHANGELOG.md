@@ -4,6 +4,8 @@ Releases up through `v0.4.0` were workspace-wide and tagged `vX.Y.Z`. From `0.4.
 
 ## [Unreleased]
 
+## [tinyboot-ch32 0.5.0] - 2026-07-11
+
 ### Changed
 
 - **Breaking:** `tinyboot-ch32`: duplex selection moved from runtime config to compile time. The `Duplex` enum and `UsartConfig::duplex` are gone; enable the new `half-duplex` cargo feature for single-wire operation (full duplex is the default, and `rx_pull` only exists without the feature). Half-duplex now uses a shared-bus drive discipline: the wire parks open-drain while idle and drives push-pull only around writes, so an idle node never contends with the wire's other talkers — **an external pull-up on the wire is now a hardware requirement** (it owns the idle mark level). Costs ~130 bytes over full duplex; full-duplex binaries are byte-identical to before.
